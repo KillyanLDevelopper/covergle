@@ -25,8 +25,11 @@ let tokenCache = { token: null, expiresAt: 0 };
 
 async function getAppToken() {
     const now = Date.now();
-    if (tokenCache.token && now < tokenCache.expiresAt) return tokenCache.token;
+    if (tokenCache.token && now < tokenCache.expiresAt) {
+        return tokenCache.token;
+    }
 
+    console.log("🔑 Demande d'un nouveau token Twitch...");
     const url = new URL("https://id.twitch.tv/oauth2/token");
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("client_secret", clientSecret);
@@ -36,6 +39,7 @@ async function getAppToken() {
     const text = await res.text();
 
     if (!res.ok) {
+        console.error("❌ Erreur token:", res.status, text);
         throw new Error(`Token HTTP ${res.status} ${text}`);
     }
 
@@ -44,9 +48,11 @@ async function getAppToken() {
     const expiresIn = Number(data.expires_in || 0);
 
     if (!token) {
+        console.error("❌ Token invalide dans la réponse");
         throw new Error(`Token invalide: ${text}`);
     }
 
+    console.log("✅ Token obtenu avec succès");
     tokenCache = {
         token,
         expiresAt: Date.now() + Math.max(0, expiresIn - 60) * 1000
@@ -69,6 +75,7 @@ async function igdbGames(query) {
 
     const text = await res.text();
     if (!res.ok) {
+        console.error("❌ Erreur IGDB:", res.status, text);
         throw new Error(`IGDB HTTP ${res.status} ${text}`);
     }
     return JSON.parse(text);
@@ -94,30 +101,48 @@ async function ensurePopularPool() {
     const now = Date.now();
     if (popularPool.length && now < popularPoolExpiresAt) return popularPool;
 
+    console.log("🔄 Chargement du pool de jeux populaires...");
+
     const query = `
-fields id,name,first_release_date,follows,hypes,total_rating,total_rating_count,cover.url;
-where category=0 & cover != null & first_release_date != null & follows != null;
-sort follows desc;
-limit 800;
+fields id,name,first_release_date,follows,total_rating_count,cover.url,platforms.name,genres.name;
+where cover != null;
+sort total_rating_count desc;
+limit 500;
 `;
-    const data = await igdbGames(query);
-    const pool = (Array.isArray(data) ? data : [])
-        .filter(g => g?.id && g?.name && g?.cover?.url)
-        .map(g => ({
-            id: String(g.id),
-            title: g.name,
-            year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
-            cover: normalizeCoverUrl(g.cover.url, "cover_big"),
-            coverSmall: normalizeCoverUrl(g.cover.url, "cover_small"),
-            aliases: [g.name],
-            follows: Number(g.follows || 0),
-        }));
 
-    popularPool = pool;
-    popularPoolMap = new Map(pool.map(g => [g.id, g]));
-    popularPoolExpiresAt = now + 6 * 60 * 60 * 1000;
+    try {
+        const data = await igdbGames(query);
+        console.log(`📦 Réponse IGDB: ${Array.isArray(data) ? data.length : 0} jeux reçus`);
 
-    return popularPool;
+        const pool = (Array.isArray(data) ? data : [])
+            .filter(g => g?.id && g?.name && g?.cover?.url)
+            .map(g => ({
+                id: String(g.id),
+                title: g.name,
+                year: g.first_release_date ? new Date(g.first_release_date * 1000).getUTCFullYear() : null,
+                cover: normalizeCoverUrl(g.cover.url, "cover_big"),
+                coverSmall: normalizeCoverUrl(g.cover.url, "cover_small"),
+                aliases: [g.name],
+                follows: Number(g.follows || 0),
+                platforms: (g.platforms ?? []).map(p => p?.name).filter(Boolean),
+                genres: (g.genres ?? []).map(x => x?.name).filter(Boolean),
+            }));
+
+        console.log(`✅ Pool créé avec ${pool.length} jeux valides`);
+
+        if (pool.length === 0) {
+            console.warn("⚠️ Le pool est vide! Vérifiez les credentials IGDB et les permissions de l'API");
+        }
+
+        popularPool = pool;
+        popularPoolMap = new Map(pool.map(g => [g.id, g]));
+        popularPoolExpiresAt = now + 6 * 60 * 60 * 1000;
+
+        return popularPool;
+    } catch (error) {
+        console.error("❌ Erreur lors du chargement du pool:", error);
+        throw error;
+    }
 }
 
 function norm(s) {
@@ -138,6 +163,12 @@ app.get("/api/search", async (req, res) => {
         if (!q) return res.json([]);
 
         const pool = await ensurePopularPool();
+
+        if (pool.length === 0) {
+            console.error("❌ Le pool est vide, impossible de rechercher");
+            return res.status(503).json({ error: "Service temporairement indisponible - pool de jeux vide" });
+        }
+
         const nq = norm(q);
 
         const items = pool
@@ -161,11 +192,14 @@ app.get("/api/search", async (req, res) => {
                 title: x.g.title,
                 year: x.g.year,
                 cover: x.g.cover,
-                aliases: x.g.aliases
+                aliases: x.g.aliases,
+                platforms: x.g.platforms || [],
+                genres: x.g.genres || []
             }));
 
         res.json(items);
     } catch (e) {
+        console.error("❌ Erreur dans /api/search:", e);
         res.status(500).json({ error: String(e?.message ?? e) });
     }
 });
@@ -201,4 +235,10 @@ limit 1;
     }
 });
 
-app.listen(port, () => {});
+app.listen(port, () => {
+    console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
+    console.log(`📝 Endpoints disponibles:`);
+    console.log(`   - GET /api/health`);
+    console.log(`   - GET /api/search?q=<query>`);
+    console.log(`   - GET /api/game/:id`);
+});
