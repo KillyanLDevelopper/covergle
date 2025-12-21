@@ -20,6 +20,11 @@ function isCorrect(guess: string, g: IgdbGame) {
     return (g.aliases ?? []).some((a) => isSameTitle(guess, a));
 }
 
+function hasCommonPlatform(guessedGame: IgdbGame | null, targetGame: IgdbGame): boolean {
+    if (!guessedGame || !guessedGame.platforms || !targetGame.platforms) return false;
+    return guessedGame.platforms.some(p => targetGame.platforms?.includes(p));
+}
+
 function shareGrid(triesUsed: number, win: boolean) {
     const blocks = ["⬛", "🟫", "🟨", "🟧", "🟩"];
     const lines: string[] = [];
@@ -117,6 +122,9 @@ export default function App() {
     const [infOver, setInfOver] = useState(false);
     const [infWin, setInfWin] = useState(false);
 
+    // Stocke les jeux devinés pour la comparaison des plateformes
+    const [guessedGames, setGuessedGames] = useState<Map<string, IgdbGame>>(new Map());
+
     const currentGame = mode === "daily" ? dailyGame : infiniteGame;
     const guesses = mode === "daily" ? dailyState.guesses : infGuesses;
     const isOver = mode === "daily" ? dailyState.isOver : infOver;
@@ -212,10 +220,16 @@ export default function App() {
         saveStats(stats);
     }
 
-    function submitGuess(guess: string) {
+    async function submitGuess(guess: string) {
         if (!currentGame) return;
         if (isOver) return;
         if (guesses.some((x) => isSameTitle(x, guess))) return;
+
+        // Chercher le jeu deviné dans le pool
+        const guessedGame = pool.find(g => isSameTitle(g.title, guess));
+        if (guessedGame) {
+            setGuessedGames(prev => new Map(prev).set(guess, guessedGame));
+        }
 
         const next = [...guesses, guess].slice(0, MAX_TRIES);
         const win = isCorrect(guess, currentGame);
@@ -246,6 +260,7 @@ export default function App() {
         setInfGuesses([]);
         setInfOver(false);
         setInfWin(false);
+        setGuessedGames(new Map());
     }
 
     const stats = useMemo(() => loadStats(), [mode, dailyState.isOver, infOver]);
@@ -329,6 +344,23 @@ export default function App() {
                         <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minWidth: 280 }}>
                             <GuessBox disabled={isOver} onSubmit={submitGuess} />
 
+                            {/* Légende du système de couleurs */}
+                            <div style={{
+                                padding: "8px 12px",
+                                borderRadius: 12,
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                background: "rgba(255,255,255,0.04)",
+                                fontSize: 12,
+                                opacity: 0.85
+                            }}>
+                                <div style={{ fontWeight: 700, marginBottom: 4 }}>Indices de couleur :</div>
+                                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                                    <span>✅ Jeu trouvé</span>
+                                    <span>🟨 Même plateforme</span>
+                                    <span>❌ Plateforme différente</span>
+                                </div>
+                            </div>
+
                             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                                 {Array.from({ length: MAX_TRIES }).map((_, i) => {
                                     const filled = i < guesses.length;
@@ -365,40 +397,78 @@ export default function App() {
                                 >
                                     {guesses.map((g, i) => {
                                         const ok = currentGame ? isCorrect(g, currentGame) : false;
+                                        const guessedGame = guessedGames.get(g);
+                                        const hasCorrectPlatform = currentGame && guessedGame ? hasCommonPlatform(guessedGame, currentGame) : false;
+
+                                        // Afficher un indice après chaque 2e essai (après 2, 4 essais)
+                                        const showHint = (i + 1) % 2 === 0 && (i + 1) < MAX_TRIES && !isOver;
+
                                         return (
-                                            <div
-                                                key={`${i}-${g}`}
-                                                style={{
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    justifyContent: "space-between",
-                                                    gap: 12,
-                                                    padding: "10px 12px",
-                                                    borderRadius: 12,
-                                                    border: "1px solid rgba(255,255,255,0.12)",
-                                                    background: "rgba(0,0,0,0.25)"
-                                                }}
-                                            >
-                                                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                                                    <div
-                                                        style={{
-                                                            width: 28,
-                                                            height: 28,
-                                                            borderRadius: 10,
-                                                            border: "1px solid rgba(255,255,255,0.14)",
-                                                            background: "rgba(255,255,255,0.08)",
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            justifyContent: "center",
-                                                            fontWeight: 800
-                                                        }}
-                                                    >
-                                                        {i + 1}
+                                            <div key={`${i}-${g}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                                <div
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "space-between",
+                                                        gap: 12,
+                                                        padding: "10px 12px",
+                                                        borderRadius: 12,
+                                                        border: `1px solid ${ok ? "rgba(0,255,0,0.3)" : hasCorrectPlatform ? "rgba(255,255,0,0.3)" : "rgba(255,255,255,0.12)"}`,
+                                                        background: ok ? "rgba(0,255,0,0.15)" : hasCorrectPlatform ? "rgba(255,255,0,0.15)" : "rgba(0,0,0,0.25)"
+                                                    }}
+                                                >
+                                                    <div style={{ display: "flex", gap: 10, alignItems: "center", flex: 1 }}>
+                                                        <div
+                                                            style={{
+                                                                width: 28,
+                                                                height: 28,
+                                                                borderRadius: 10,
+                                                                border: "1px solid rgba(255,255,255,0.14)",
+                                                                background: "rgba(255,255,255,0.08)",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                fontWeight: 800
+                                                            }}
+                                                        >
+                                                            {i + 1}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 700 }}>{g}</div>
+                                                            {hasCorrectPlatform && !ok && guessedGame && currentGame && (
+                                                                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                                                                    🎮 Plateforme commune trouvée !
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <div style={{ fontWeight: 700 }}>{g}</div>
+
+                                                    <div style={{ fontWeight: 900 }}>
+                                                        {ok ? "✅" : hasCorrectPlatform ? "🟨" : "❌"}
+                                                    </div>
                                                 </div>
 
-                                                <div style={{ fontWeight: 900 }}>{ok ? "✅" : "❌"}</div>
+                                                {showHint && currentGame && (
+                                                    <div
+                                                        style={{
+                                                            padding: "10px 12px",
+                                                            borderRadius: 12,
+                                                            border: "1px solid rgba(100,200,255,0.3)",
+                                                            background: "rgba(100,200,255,0.1)",
+                                                            fontSize: 13,
+                                                            opacity: 0.9
+                                                        }}
+                                                    >
+                                                        <div style={{ fontWeight: 700, marginBottom: 4 }}>💡 Indice :</div>
+                                                        {currentGame.year && <div>📅 Année : {currentGame.year}</div>}
+                                                        {currentGame.platforms && currentGame.platforms.length > 0 && (
+                                                            <div>🎮 Plateformes : {currentGame.platforms.slice(0, 3).join(", ")}{currentGame.platforms.length > 3 ? "..." : ""}</div>
+                                                        )}
+                                                        {currentGame.genres && currentGame.genres.length > 0 && (
+                                                            <div>🎯 Genres : {currentGame.genres.slice(0, 2).join(", ")}{currentGame.genres.length > 2 ? "..." : ""}</div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
