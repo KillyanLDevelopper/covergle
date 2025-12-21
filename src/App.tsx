@@ -267,118 +267,360 @@ export default function App() {
     const title = mode === "daily" ? "Daily" : "Infinite";
 
     return (
-        <div style={{ minHeight: "100vh", color: "white", display: "flex", justifyContent: "center", padding: 18 }}>
-            <div style={{ width: "min(980px, 96vw)", display: "flex", flexDirection: "column", gap: 16 }}>
-                <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-                    <div>
-                        <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: 0.3 }}>Covergle</div>
-                        <div style={{ opacity: 0.7, fontSize: 13 }}>
-                            {title}
-                            {mode === "daily" ? ` · ${dateIso}` : ""}
-                            {!poolReady ? " · chargement…" : ""}
-                            {poolReady && poolError ? ` · erreur: ${poolError}` : ""}
+        <div style={{
+            minHeight: "100vh",
+            color: "white",
+            display: "flex",
+            justifyContent: "center",
+            padding: "20px",
+            animation: "fadeIn 0.5s ease-out"
+        }}>
+            <div style={{
+                width: "min(1100px, 100%)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 24
+            }}>
+                {/* Header moderne avec glassmorphism */}
+                <header style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 16,
+                    padding: "20px 24px",
+                    background: "rgba(255, 255, 255, 0.05)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    border: "1px solid rgba(255, 255, 255, 0.1)",
+                    borderRadius: 20,
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
+                    animation: "slideIn 0.6s ease-out"
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        <div style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 12,
+                            background: "linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 24,
+                            fontWeight: 800,
+                            boxShadow: "0 4px 15px rgba(124, 58, 237, 0.4)"
+                        }}>
+                            🎮
+                        </div>
+                        <div>
+                            <div style={{
+                                fontSize: 26,
+                                fontWeight: 900,
+                                letterSpacing: -0.5,
+                                background: "linear-gradient(135deg, #ffffff 0%, #a78bfa 100%)",
+                                WebkitBackgroundClip: "text",
+                                WebkitTextFillColor: "transparent",
+                                backgroundClip: "text"
+                            }}>
+                                Covergle
+                            </div>
+                            <div style={{
+                                opacity: 0.7,
+                                fontSize: 13,
+                                fontWeight: 500,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8
+                            }}>
+                                <span style={{
+                                    padding: "2px 8px",
+                                    background: mode === "daily" ? "rgba(124, 58, 237, 0.3)" : "rgba(6, 182, 212, 0.3)",
+                                    borderRadius: 6,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.5
+                                }}>
+                                    {title}
+                                </span>
+                                {mode === "daily" && <span>· {dateIso}</span>}
+                                {!poolReady && <span>· Chargement…</span>}
+                                {poolReady && poolError && <span style={{ color: "#ef4444" }}>· Erreur</span>}
+                            </div>
                         </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                         <button
                             onClick={() => setMode("daily")}
                             style={{
-                                padding: "10px 12px",
+                                padding: "10px 18px",
                                 borderRadius: 12,
-                                border: "1px solid rgba(255,255,255,0.16)",
-                                background: mode === "daily" ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)",
+                                border: mode === "daily" ? "2px solid rgba(124, 58, 237, 0.5)" : "1px solid rgba(255,255,255,0.1)",
+                                background: mode === "daily"
+                                    ? "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)"
+                                    : "rgba(255,255,255,0.05)",
+                                backdropFilter: "blur(10px)",
                                 color: "white",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                fontSize: 14,
+                                transition: "all 0.3s ease",
+                                boxShadow: mode === "daily" ? "0 4px 15px rgba(124, 58, 237, 0.3)" : "none"
+                            }}
+                            onMouseEnter={(e) => {
+                                if (mode !== "daily") {
+                                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (mode !== "daily") {
+                                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                }
                             }}
                         >
-                            Daily
+                            📅 Daily
                         </button>
                         <button
                             onClick={() => setMode("infinite")}
                             style={{
-                                padding: "10px 12px",
+                                padding: "10px 18px",
                                 borderRadius: 12,
-                                border: "1px solid rgba(255,255,255,0.16)",
-                                background: mode === "infinite" ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)",
+                                border: mode === "infinite" ? "2px solid rgba(6, 182, 212, 0.5)" : "1px solid rgba(255,255,255,0.1)",
+                                background: mode === "infinite"
+                                    ? "linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(34, 211, 238, 0.2) 100%)"
+                                    : "rgba(255,255,255,0.05)",
+                                backdropFilter: "blur(10px)",
                                 color: "white",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                fontSize: 14,
+                                transition: "all 0.3s ease",
+                                boxShadow: mode === "infinite" ? "0 4px 15px rgba(6, 182, 212, 0.3)" : "none"
+                            }}
+                            onMouseEnter={(e) => {
+                                if (mode !== "infinite") {
+                                    e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (mode !== "infinite") {
+                                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                }
                             }}
                         >
-                            Infinite
+                            ♾️ Infinite
                         </button>
                         <button
                             onClick={() => loadPool()}
                             style={{
-                                padding: "10px 12px",
+                                padding: "10px 18px",
                                 borderRadius: 12,
-                                border: "1px solid rgba(255,255,255,0.16)",
-                                background: "rgba(255,255,255,0.08)",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                                background: "rgba(255,255,255,0.05)",
+                                backdropFilter: "blur(10px)",
                                 color: "white",
-                                cursor: "pointer"
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                fontSize: 14,
+                                transition: "all 0.3s ease"
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                                e.currentTarget.style.transform = "translateY(-2px)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                                e.currentTarget.style.transform = "translateY(0)";
                             }}
                         >
-                            Recharger le pool
+                            🔄 Recharger
                         </button>
                     </div>
                 </header>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
-                    <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
-                        <div style={{ width: 320, height: 320 }}>
-                            {currentGame?.cover ? (
-                                <CanvasPixelCover src={currentGame.cover} revealStep={revealStep} size={320} />
-                            ) : (
-                                <div
-                                    style={{
-                                        width: 320,
-                                        height: 320,
-                                        borderRadius: 16,
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        background: "rgba(255,255,255,0.06)"
-                                    }}
-                                />
-                            )}
+                {/* Zone de jeu principale avec carte glassmorphism */}
+                <div style={{
+                    padding: "28px",
+                    background: "rgba(255, 255, 255, 0.04)",
+                    backdropFilter: "blur(20px)",
+                    WebkitBackdropFilter: "blur(20px)",
+                    border: "1px solid rgba(255, 255, 255, 0.08)",
+                    borderRadius: 24,
+                    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+                    animation: "scaleIn 0.5s ease-out 0.2s both"
+                }}>
+                    <div style={{
+                        display: "flex",
+                        gap: 28,
+                        alignItems: "flex-start",
+                        flexWrap: "wrap",
+                        justifyContent: "center"
+                    }}>
+                        {/* Image de couverture avec effet premium */}
+                        <div style={{
+                            position: "relative",
+                            animation: "fadeIn 0.6s ease-out 0.3s both"
+                        }}>
+                            <div style={{
+                                width: 320,
+                                height: 320,
+                                borderRadius: 20,
+                                overflow: "hidden",
+                                boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+                                position: "relative"
+                            }}>
+                                {currentGame?.cover ? (
+                                    <>
+                                        <CanvasPixelCover src={currentGame.cover} revealStep={revealStep} size={320} />
+                                        {/* Overlay gradient subtil */}
+                                        <div style={{
+                                            position: "absolute",
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            height: "40%",
+                                            background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)",
+                                            pointerEvents: "none"
+                                        }} />
+                                    </>
+                                ) : (
+                                    <div style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        background: "linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 48,
+                                        opacity: 0.3
+                                    }}>
+                                        🎮
+                                    </div>
+                                )}
+                            </div>
+                            {/* Indicateur d'essai */}
+                            <div style={{
+                                position: "absolute",
+                                top: 12,
+                                right: 12,
+                                padding: "6px 12px",
+                                background: "rgba(0, 0, 0, 0.7)",
+                                backdropFilter: "blur(10px)",
+                                borderRadius: 999,
+                                fontSize: 13,
+                                fontWeight: 700,
+                                border: "1px solid rgba(255, 255, 255, 0.2)"
+                            }}>
+                                {guesses.length}/{MAX_TRIES}
+                            </div>
                         </div>
 
-                        <div style={{ display: "flex", flexDirection: "column", gap: 12, flex: 1, minWidth: 280 }}>
+                        <div style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 16,
+                            flex: 1,
+                            minWidth: 300,
+                            animation: "fadeIn 0.6s ease-out 0.4s both"
+                        }}>
                             <GuessBox disabled={isOver} onSubmit={submitGuess} />
 
-                            {/* Légende du système de couleurs */}
+                            {/* Légende du système de couleurs avec design amélioré */}
                             <div style={{
-                                padding: "8px 12px",
-                                borderRadius: 12,
+                                padding: "12px 16px",
+                                borderRadius: 14,
                                 border: "1px solid rgba(255,255,255,0.1)",
-                                background: "rgba(255,255,255,0.04)",
-                                fontSize: 12,
-                                opacity: 0.85
+                                background: "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(6, 182, 212, 0.08) 100%)",
+                                backdropFilter: "blur(10px)",
+                                fontSize: 13,
+                                fontWeight: 600
                             }}>
-                                <div style={{ fontWeight: 700, marginBottom: 4 }}>Indices de couleur :</div>
-                                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                                    <span>✅ Jeu trouvé</span>
-                                    <span>🟨 Même plateforme</span>
-                                    <span>❌ Plateforme différente</span>
+                                <div style={{ marginBottom: 8, opacity: 0.9, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                    Guide des couleurs
+                                </div>
+                                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <div style={{
+                                            width: 20,
+                                            height: 20,
+                                            borderRadius: 6,
+                                            background: "linear-gradient(135deg, #10b981 0%, #34d399 100%)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: 11
+                                        }}>✓</div>
+                                        <span>Jeu trouvé</span>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <div style={{
+                                            width: 20,
+                                            height: 20,
+                                            borderRadius: 6,
+                                            background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: 11
+                                        }}>○</div>
+                                        <span>Même plateforme</span>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                        <div style={{
+                                            width: 20,
+                                            height: 20,
+                                            borderRadius: 6,
+                                            background: "rgba(255, 255, 255, 0.1)",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: 11
+                                        }}>×</div>
+                                        <span>Différent</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                            {/* Indicateurs d'essais modernisés */}
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                 {Array.from({ length: MAX_TRIES }).map((_, i) => {
                                     const filled = i < guesses.length;
+                                    const isCurrent = i === guesses.length && !isOver;
                                     return (
                                         <div
                                             key={i}
                                             style={{
-                                                width: 44,
-                                                height: 44,
+                                                width: 48,
+                                                height: 48,
                                                 borderRadius: 12,
-                                                border: "1px solid rgba(255,255,255,0.14)",
-                                                background: filled ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.06)",
+                                                border: isCurrent
+                                                    ? "2px solid rgba(124, 58, 237, 0.6)"
+                                                    : "1px solid rgba(255,255,255,0.12)",
+                                                background: filled
+                                                    ? "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)"
+                                                    : "rgba(255,255,255,0.04)",
+                                                backdropFilter: "blur(10px)",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 justifyContent: "center",
-                                                fontWeight: 800
+                                                fontWeight: 800,
+                                                fontSize: 16,
+                                                transition: "all 0.3s ease",
+                                                boxShadow: filled ? "0 4px 12px rgba(124, 58, 237, 0.3)" : "none",
+                                                animation: filled ? "scaleIn 0.3s ease-out" : "none",
+                                                cursor: filled ? "pointer" : "default"
                                             }}
                                             title={filled ? guesses[i] : ""}
+                                            onMouseEnter={(e) => {
+                                                if (filled) e.currentTarget.style.transform = "scale(1.1)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (filled) e.currentTarget.style.transform = "scale(1)";
+                                            }}
                                         >
                                             {filled ? i + 1 : ""}
                                         </div>
@@ -389,10 +631,10 @@ export default function App() {
                             {guesses.length > 0 && (
                                 <div
                                     style={{
-                                        width: "min(520px, 92vw)",
+                                        width: "100%",
                                         display: "flex",
                                         flexDirection: "column",
-                                        gap: 8
+                                        gap: 10
                                     }}
                                 >
                                     {guesses.map((g, i) => {
@@ -404,46 +646,81 @@ export default function App() {
                                         const showHint = (i + 1) % 2 === 0 && (i + 1) < MAX_TRIES && !isOver;
 
                                         return (
-                                            <div key={`${i}-${g}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                            <div key={`${i}-${g}`} style={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: 10,
+                                                animation: "slideIn 0.4s ease-out"
+                                            }}>
                                                 <div
                                                     style={{
                                                         display: "flex",
                                                         alignItems: "center",
                                                         justifyContent: "space-between",
                                                         gap: 12,
-                                                        padding: "10px 12px",
-                                                        borderRadius: 12,
-                                                        border: `1px solid ${ok ? "rgba(0,255,0,0.3)" : hasCorrectPlatform ? "rgba(255,255,0,0.3)" : "rgba(255,255,255,0.12)"}`,
-                                                        background: ok ? "rgba(0,255,0,0.15)" : hasCorrectPlatform ? "rgba(255,255,0,0.15)" : "rgba(0,0,0,0.25)"
+                                                        padding: "14px 16px",
+                                                        borderRadius: 14,
+                                                        border: ok
+                                                            ? "2px solid rgba(16, 185, 129, 0.5)"
+                                                            : hasCorrectPlatform
+                                                                ? "2px solid rgba(245, 158, 11, 0.5)"
+                                                                : "1px solid rgba(255,255,255,0.1)",
+                                                        background: ok
+                                                            ? "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.1) 100%)"
+                                                            : hasCorrectPlatform
+                                                                ? "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%)"
+                                                                : "rgba(255, 255, 255, 0.03)",
+                                                        backdropFilter: "blur(10px)",
+                                                        boxShadow: ok
+                                                            ? "0 4px 20px rgba(16, 185, 129, 0.3)"
+                                                            : hasCorrectPlatform
+                                                                ? "0 4px 20px rgba(245, 158, 11, 0.2)"
+                                                                : "0 2px 8px rgba(0, 0, 0, 0.2)",
+                                                        transition: "all 0.3s ease"
                                                     }}
                                                 >
-                                                    <div style={{ display: "flex", gap: 10, alignItems: "center", flex: 1 }}>
+                                                    <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1 }}>
                                                         <div
                                                             style={{
-                                                                width: 28,
-                                                                height: 28,
+                                                                width: 36,
+                                                                height: 36,
                                                                 borderRadius: 10,
-                                                                border: "1px solid rgba(255,255,255,0.14)",
-                                                                background: "rgba(255,255,255,0.08)",
+                                                                background: ok
+                                                                    ? "linear-gradient(135deg, #10b981 0%, #34d399 100%)"
+                                                                    : hasCorrectPlatform
+                                                                        ? "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
+                                                                        : "rgba(255,255,255,0.08)",
                                                                 display: "flex",
                                                                 alignItems: "center",
                                                                 justifyContent: "center",
-                                                                fontWeight: 800
+                                                                fontWeight: 900,
+                                                                fontSize: 15,
+                                                                boxShadow: ok || hasCorrectPlatform ? "0 2px 8px rgba(0, 0, 0, 0.3)" : "none"
                                                             }}
                                                         >
                                                             {i + 1}
                                                         </div>
                                                         <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: 700 }}>{g}</div>
+                                                            <div style={{ fontWeight: 700, fontSize: 15 }}>{g}</div>
                                                             {hasCorrectPlatform && !ok && guessedGame && currentGame && (
-                                                                <div style={{ fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+                                                                <div style={{
+                                                                    fontSize: 12,
+                                                                    opacity: 0.8,
+                                                                    marginTop: 4,
+                                                                    fontWeight: 600,
+                                                                    color: "#fbbf24"
+                                                                }}>
                                                                     🎮 Plateforme commune trouvée !
                                                                 </div>
                                                             )}
                                                         </div>
                                                     </div>
 
-                                                    <div style={{ fontWeight: 900 }}>
+                                                    <div style={{
+                                                        fontWeight: 900,
+                                                        fontSize: 20,
+                                                        filter: ok ? "drop-shadow(0 0 8px rgba(16, 185, 129, 0.8))" : "none"
+                                                    }}>
                                                         {ok ? "✅" : hasCorrectPlatform ? "🟨" : "❌"}
                                                     </div>
                                                 </div>
@@ -451,22 +728,120 @@ export default function App() {
                                                 {showHint && currentGame && (
                                                     <div
                                                         style={{
-                                                            padding: "10px 12px",
-                                                            borderRadius: 12,
-                                                            border: "1px solid rgba(100,200,255,0.3)",
-                                                            background: "rgba(100,200,255,0.1)",
+                                                            padding: "16px 18px",
+                                                            borderRadius: 14,
+                                                            border: "2px solid rgba(6, 182, 212, 0.3)",
+                                                            background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(14, 165, 233, 0.1) 100%)",
+                                                            backdropFilter: "blur(10px)",
                                                             fontSize: 13,
-                                                            opacity: 0.9
+                                                            boxShadow: "0 4px 20px rgba(6, 182, 212, 0.2)",
+                                                            animation: "scaleIn 0.4s ease-out"
                                                         }}
                                                     >
-                                                        <div style={{ fontWeight: 700, marginBottom: 4 }}>💡 Indice :</div>
-                                                        {currentGame.year && <div>📅 Année : {currentGame.year}</div>}
-                                                        {currentGame.platforms && currentGame.platforms.length > 0 && (
-                                                            <div>🎮 Plateformes : {currentGame.platforms.slice(0, 3).join(", ")}{currentGame.platforms.length > 3 ? "..." : ""}</div>
-                                                        )}
-                                                        {currentGame.genres && currentGame.genres.length > 0 && (
-                                                            <div>🎯 Genres : {currentGame.genres.slice(0, 2).join(", ")}{currentGame.genres.length > 2 ? "..." : ""}</div>
-                                                        )}
+                                                        <div style={{
+                                                            fontWeight: 800,
+                                                            marginBottom: 10,
+                                                            fontSize: 14,
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            gap: 8,
+                                                            color: "#22d3ee"
+                                                        }}>
+                                                            💡 <span>Indice #{(i + 1) / 2}</span>
+                                                        </div>
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                                            {currentGame.year && (
+                                                                <div style={{
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: 8,
+                                                                    padding: "6px 0"
+                                                                }}>
+                                                                    <span style={{ opacity: 0.8 }}>📅</span>
+                                                                    <span style={{ fontWeight: 600 }}>Année :</span>
+                                                                    <span style={{
+                                                                        padding: "2px 10px",
+                                                                        background: "rgba(6, 182, 212, 0.2)",
+                                                                        borderRadius: 6,
+                                                                        fontWeight: 700
+                                                                    }}>
+                                                                        {currentGame.year}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {currentGame.platforms && currentGame.platforms.length > 0 && (
+                                                                <div style={{
+                                                                    display: "flex",
+                                                                    alignItems: "flex-start",
+                                                                    gap: 8,
+                                                                    padding: "6px 0"
+                                                                }}>
+                                                                    <span style={{ opacity: 0.8 }}>🎮</span>
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <div style={{ fontWeight: 600, marginBottom: 6 }}>Plateformes :</div>
+                                                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                                                            {currentGame.platforms.slice(0, 3).map((p, idx) => (
+                                                                                <span key={idx} style={{
+                                                                                    padding: "4px 10px",
+                                                                                    background: "rgba(6, 182, 212, 0.2)",
+                                                                                    border: "1px solid rgba(6, 182, 212, 0.3)",
+                                                                                    borderRadius: 8,
+                                                                                    fontSize: 12,
+                                                                                    fontWeight: 600
+                                                                                }}>
+                                                                                    {p}
+                                                                                </span>
+                                                                            ))}
+                                                                            {currentGame.platforms.length > 3 && (
+                                                                                <span style={{
+                                                                                    padding: "4px 10px",
+                                                                                    opacity: 0.6,
+                                                                                    fontSize: 12
+                                                                                }}>
+                                                                                    +{currentGame.platforms.length - 3}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {currentGame.genres && currentGame.genres.length > 0 && (
+                                                                <div style={{
+                                                                    display: "flex",
+                                                                    alignItems: "flex-start",
+                                                                    gap: 8,
+                                                                    padding: "6px 0"
+                                                                }}>
+                                                                    <span style={{ opacity: 0.8 }}>🎯</span>
+                                                                    <div style={{ flex: 1 }}>
+                                                                        <div style={{ fontWeight: 600, marginBottom: 6 }}>Genres :</div>
+                                                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                                                            {currentGame.genres.slice(0, 2).map((genre, idx) => (
+                                                                                <span key={idx} style={{
+                                                                                    padding: "4px 10px",
+                                                                                    background: "rgba(6, 182, 212, 0.2)",
+                                                                                    border: "1px solid rgba(6, 182, 212, 0.3)",
+                                                                                    borderRadius: 8,
+                                                                                    fontSize: 12,
+                                                                                    fontWeight: 600
+                                                                                }}>
+                                                                                    {genre}
+                                                                                </span>
+                                                                            ))}
+                                                                            {currentGame.genres.length > 2 && (
+                                                                                <span style={{
+                                                                                    padding: "4px 10px",
+                                                                                    opacity: 0.6,
+                                                                                    fontSize: 12
+                                                                                }}>
+                                                                                    +{currentGame.genres.length - 2}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -478,18 +853,49 @@ export default function App() {
                             {isOver && currentGame && (
                                 <div
                                     style={{
-                                        padding: 12,
-                                        borderRadius: 14,
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        background: "rgba(0,0,0,0.35)"
+                                        padding: "20px 24px",
+                                        borderRadius: 18,
+                                        border: isWin
+                                            ? "2px solid rgba(16, 185, 129, 0.5)"
+                                            : "2px solid rgba(239, 68, 68, 0.5)",
+                                        background: isWin
+                                            ? "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.1) 100%)"
+                                            : "linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(248, 113, 113, 0.1) 100%)",
+                                        backdropFilter: "blur(10px)",
+                                        boxShadow: isWin
+                                            ? "0 8px 32px rgba(16, 185, 129, 0.3)"
+                                            : "0 8px 32px rgba(239, 68, 68, 0.3)",
+                                        animation: "scaleIn 0.5s ease-out"
                                     }}
                                 >
-                                    <div style={{ fontWeight: 800, fontSize: 16 }}>{isWin ? "Gagné !" : "Perdu"}</div>
-                                    <div style={{ opacity: 0.8, marginTop: 4 }}>
-                                        Réponse : <span style={{ fontWeight: 800 }}>{currentGame.title}</span>
+                                    <div style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 12,
+                                        marginBottom: 12
+                                    }}>
+                                        <div style={{
+                                            fontSize: 36,
+                                            animation: isWin ? "pulse 1s ease-in-out infinite" : "none"
+                                        }}>
+                                            {isWin ? "🎉" : "😢"}
+                                        </div>
+                                        <div>
+                                            <div style={{
+                                                fontWeight: 900,
+                                                fontSize: 24,
+                                                marginBottom: 4,
+                                                color: isWin ? "#10b981" : "#ef4444"
+                                            }}>
+                                                {isWin ? "Gagné !" : "Perdu"}
+                                            </div>
+                                            <div style={{ opacity: 0.9, fontSize: 14 }}>
+                                                Réponse : <span style={{ fontWeight: 800, fontSize: 15 }}>{currentGame.title}</span>
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
                                         <button
                                             onClick={async () => {
                                                 const text = `Covergle ${mode === "daily" ? dateIso : "Infinite"}\n${shareGrid(
@@ -503,87 +909,203 @@ export default function App() {
                                                 }
                                             }}
                                             style={{
-                                                padding: "10px 12px",
+                                                padding: "12px 20px",
                                                 borderRadius: 12,
-                                                border: "1px solid rgba(255,255,255,0.16)",
-                                                background: "rgba(255,255,255,0.12)",
+                                                border: "1px solid rgba(124, 58, 237, 0.5)",
+                                                background: "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)",
+                                                backdropFilter: "blur(10px)",
                                                 color: "white",
-                                                cursor: "pointer"
+                                                cursor: "pointer",
+                                                fontWeight: 600,
+                                                fontSize: 14,
+                                                transition: "all 0.3s ease",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.transform = "translateY(-2px)";
+                                                e.currentTarget.style.boxShadow = "0 8px 20px rgba(124, 58, 237, 0.4)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.transform = "translateY(0)";
+                                                e.currentTarget.style.boxShadow = "none";
                                             }}
                                         >
-                                            Copier le share
+                                            📋 Copier le résultat
                                         </button>
 
                                         {mode === "infinite" && (
                                             <button
                                                 onClick={resetInfinite}
                                                 style={{
-                                                    padding: "10px 12px",
+                                                    padding: "12px 20px",
                                                     borderRadius: 12,
-                                                    border: "1px solid rgba(255,255,255,0.16)",
-                                                    background: "rgba(255,255,255,0.12)",
+                                                    border: "1px solid rgba(6, 182, 212, 0.5)",
+                                                    background: "linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(34, 211, 238, 0.2) 100%)",
+                                                    backdropFilter: "blur(10px)",
                                                     color: "white",
-                                                    cursor: "pointer"
+                                                    cursor: "pointer",
+                                                    fontWeight: 600,
+                                                    fontSize: 14,
+                                                    transition: "all 0.3s ease",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 8
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                                    e.currentTarget.style.boxShadow = "0 8px 20px rgba(6, 182, 212, 0.4)";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.transform = "translateY(0)";
+                                                    e.currentTarget.style.boxShadow = "none";
                                                 }}
                                             >
-                                                Rejouer
+                                                🔄 Rejouer
                                             </button>
                                         )}
                                     </div>
                                 </div>
                             )}
 
-                            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", opacity: 0.85, fontSize: 13 }}>
+                            {/* Statistiques avec design amélioré */}
+                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
                                 <div
                                     style={{
-                                        padding: "8px 10px",
+                                        padding: "10px 14px",
                                         borderRadius: 12,
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        background: "rgba(255,255,255,0.06)"
+                                        border: "1px solid rgba(124, 58, 237, 0.3)",
+                                        background: "linear-gradient(135deg, rgba(124, 58, 237, 0.15) 0%, rgba(167, 139, 250, 0.1) 100%)",
+                                        backdropFilter: "blur(10px)",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8
                                     }}
                                 >
-                                    Parties: <b>{stats.played}</b>
+                                    <span style={{ opacity: 0.8 }}>🎮</span>
+                                    <span>Parties:</span> <b>{stats.played}</b>
                                 </div>
                                 <div
                                     style={{
-                                        padding: "8px 10px",
+                                        padding: "10px 14px",
                                         borderRadius: 12,
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        background: "rgba(255,255,255,0.06)"
+                                        border: "1px solid rgba(16, 185, 129, 0.3)",
+                                        background: "linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(52, 211, 153, 0.1) 100%)",
+                                        backdropFilter: "blur(10px)",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8
                                     }}
                                 >
-                                    Victoires: <b>{stats.wins}</b>
+                                    <span style={{ opacity: 0.8 }}>🏆</span>
+                                    <span>Victoires:</span> <b>{stats.wins}</b>
                                 </div>
                                 <div
                                     style={{
-                                        padding: "8px 10px",
+                                        padding: "10px 14px",
                                         borderRadius: 12,
-                                        border: "1px solid rgba(255,255,255,0.12)",
-                                        background: "rgba(255,255,255,0.06)"
+                                        border: "1px solid rgba(245, 158, 11, 0.3)",
+                                        background: "linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.1) 100%)",
+                                        backdropFilter: "blur(10px)",
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8
                                     }}
                                 >
-                                    Série: <b>{stats.currentStreak}</b> (max {stats.bestStreak})
+                                    <span style={{ opacity: 0.8 }}>🔥</span>
+                                    <span>Série:</span> <b>{stats.currentStreak}</b> <span style={{ opacity: 0.6, fontSize: 11 }}>(max {stats.bestStreak})</span>
                                 </div>
                             </div>
 
-                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", opacity: 0.75, fontSize: 12 }}>
-                                <span>Distribution:</span>
-                                {(["1", "2", "3", "4", "5", "6"] as const).map((k) => (
-                                    <span
-                                        key={k}
-                                        style={{ padding: "4px 8px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.12)" }}
-                                    >
-                    {k}: <b>{stats.winDistribution[k]}</b>
-                  </span>
-                                ))}
+                            {/* Distribution des victoires */}
+                            <div style={{
+                                marginTop: 12,
+                                padding: "14px 16px",
+                                background: "rgba(255, 255, 255, 0.03)",
+                                backdropFilter: "blur(10px)",
+                                borderRadius: 14,
+                                border: "1px solid rgba(255, 255, 255, 0.08)"
+                            }}>
+                                <div style={{
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    opacity: 0.7,
+                                    marginBottom: 10,
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.5
+                                }}>
+                                    📊 Distribution des victoires
+                                </div>
+                                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                                    {(["1", "2", "3", "4", "5", "6"] as const).map((k) => (
+                                        <div
+                                            key={k}
+                                            style={{
+                                                padding: "6px 12px",
+                                                borderRadius: 999,
+                                                border: "1px solid rgba(255,255,255,0.1)",
+                                                background: stats.winDistribution[k] > 0
+                                                    ? "linear-gradient(135deg, rgba(124, 58, 237, 0.2) 0%, rgba(167, 139, 250, 0.1) 100%)"
+                                                    : "rgba(255,255,255,0.03)",
+                                                fontSize: 12,
+                                                fontWeight: 600,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 6,
+                                                transition: "all 0.3s ease"
+                                            }}
+                                        >
+                                            <span style={{ opacity: 0.7 }}>{k}</span>
+                                            <b>{stats.winDistribution[k]}</b>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
-
-                    <footer style={{ opacity: 0.65, fontSize: 12 }}>
-                        Daily = même jeu pour tout le monde (Europe/Paris). Infinite = jeux aléatoires. Données via IGDB.
-                    </footer>
                 </div>
+
+                {/* Footer moderne */}
+                <footer style={{
+                    marginTop: 20,
+                    padding: "16px 20px",
+                    background: "rgba(255, 255, 255, 0.03)",
+                    backdropFilter: "blur(10px)",
+                    border: "1px solid rgba(255, 255, 255, 0.06)",
+                    borderRadius: 16,
+                    fontSize: 12,
+                    opacity: 0.8,
+                    textAlign: "center",
+                    animation: "fadeIn 0.6s ease-out 0.8s both"
+                }}>
+                    <div style={{ marginBottom: 8, fontWeight: 600 }}>
+                        <span style={{ opacity: 0.7 }}>⚡</span> Daily = même jeu pour tous (Europe/Paris)
+                        <span style={{ margin: "0 8px", opacity: 0.4 }}>•</span>
+                        <span style={{ opacity: 0.7 }}>🔄</span> Infinite = jeux aléatoires illimités
+                    </div>
+                    <div style={{ fontSize: 11, opacity: 0.6 }}>
+                        Données fournies par <a href="https://www.igdb.com/" target="_blank" rel="noopener noreferrer" style={{
+                            color: "#a78bfa",
+                            textDecoration: "none",
+                            fontWeight: 600,
+                            transition: "all 0.2s ease"
+                        }}>IGDB</a>
+                        <span style={{ margin: "0 6px" }}>•</span>
+                        Inspiré de <a href="https://www.nytimes.com/games/wordle/" target="_blank" rel="noopener noreferrer" style={{
+                            color: "#06b6d4",
+                            textDecoration: "none",
+                            fontWeight: 600,
+                            transition: "all 0.2s ease"
+                        }}>Wordle</a>
+                    </div>
+                </footer>
             </div>
         </div>
     );
