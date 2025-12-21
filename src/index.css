@@ -1,0 +1,15 @@
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background: radial-gradient(1200px 600px at 30% -10%, rgba(120, 80, 255, 0.35), transparent 60%),
+  radial-gradient(900px 520px at 90% 10%, rgba(0, 200, 255, 0.18), transparent 55%),
+  #0b0b10;
+}
