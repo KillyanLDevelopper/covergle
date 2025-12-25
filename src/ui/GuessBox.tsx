@@ -32,10 +32,20 @@ export function GuessBox({ disabled, onSubmit }: Props) {
         return () => clearTimeout(t);
     }, [q, value, disabled]);
 
-    function submit(v: string) {
+    function submit(v: string, forceValue = false) {
         const guess = v.trim();
         if (!guess) return;
-        onSubmit(guess);
+
+        // Si forceValue est true, utiliser la valeur fournie directement
+        // Sinon, si des suggestions existent, prendre le premier jeu
+        if (forceValue) {
+            onSubmit(guess);
+        } else if (items.length > 0) {
+            onSubmit(items[0].title);
+        } else {
+            onSubmit(guess);
+        }
+
         setValue("");
         setOpen(false);
         setItems([]);
@@ -55,7 +65,7 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                     }}
 
                     onKeyDown={e => {
-                        if (e.key === "Enter") submit(value);
+                        if (e.key === "Enter") submit(value, false); // forceValue=false pour prendre le premier
                     }}
                     placeholder="Tape le nom du jeu…"
                     style={{
@@ -70,7 +80,7 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                 />
                 <button
                     disabled={disabled}
-                    onClick={() => submit(value)}
+                    onClick={() => submit(value, false)} // forceValue=false pour prendre le premier de la liste
                     style={{
                         padding: "12px 14px",
                         borderRadius: 12,
@@ -99,7 +109,7 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                             key={g.id}
                             onMouseDown={e => {
                                 e.preventDefault();
-                                submit(g.title);
+                                submit(g.title, true); // forceValue=true pour utiliser le titre cliqué
                             }}
                             style={{
                                 width: "100%",
