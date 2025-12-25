@@ -20,9 +20,19 @@ function isCorrect(guess: string, g: IgdbGame) {
     return (g.aliases ?? []).some((a) => isSameTitle(guess, a));
 }
 
-function hasCommonPlatform(guessedGame: IgdbGame | null, targetGame: IgdbGame): boolean {
-    if (!guessedGame || !guessedGame.platforms || !targetGame.platforms) return false;
-    return guessedGame.platforms.some(p => targetGame.platforms?.includes(p));
+function getCommonPlatforms(guessedGame: IgdbGame | null, targetGame: IgdbGame): string[] {
+    if (!guessedGame || !guessedGame.platforms || !targetGame.platforms) return [];
+    return guessedGame.platforms.filter(p => targetGame.platforms?.includes(p));
+}
+
+function hasSameYear(guessedGame: IgdbGame | null, targetGame: IgdbGame): boolean {
+    if (!guessedGame || !guessedGame.year || !targetGame.year) return false;
+    return guessedGame.year === targetGame.year;
+}
+
+function getCommonGenres(guessedGame: IgdbGame | null, targetGame: IgdbGame): string[] {
+    if (!guessedGame || !guessedGame.genres || !targetGame.genres) return [];
+    return guessedGame.genres.filter(g => targetGame.genres?.includes(g));
 }
 
 function shareGrid(triesUsed: number, win: boolean) {
@@ -567,7 +577,7 @@ export default function App() {
                                             justifyContent: "center",
                                             fontSize: 11
                                         }}>○</div>
-                                        <span>Même plateforme</span>
+                                        <span>Correspondances</span>
                                     </div>
                                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                         <div style={{
@@ -580,7 +590,7 @@ export default function App() {
                                             justifyContent: "center",
                                             fontSize: 11
                                         }}>×</div>
-                                        <span>Différent</span>
+                                        <span>Aucune</span>
                                     </div>
                                 </div>
                             </div>
@@ -640,10 +650,11 @@ export default function App() {
                                     {guesses.map((g, i) => {
                                         const ok = currentGame ? isCorrect(g, currentGame) : false;
                                         const guessedGame = guessedGames.get(g);
-                                        const hasCorrectPlatform = currentGame && guessedGame ? hasCommonPlatform(guessedGame, currentGame) : false;
-
-                                        // Afficher un indice après chaque 2e essai (après 2, 4 essais)
-                                        const showHint = (i + 1) % 2 === 0 && (i + 1) < MAX_TRIES && !isOver;
+                                        const commonPlatforms = currentGame && guessedGame ? getCommonPlatforms(guessedGame, currentGame) : [];
+                                        const sameYear = currentGame && guessedGame ? hasSameYear(guessedGame, currentGame) : false;
+                                        const commonGenres = currentGame && guessedGame ? getCommonGenres(guessedGame, currentGame) : [];
+                                        const hasCorrectPlatform = commonPlatforms.length > 0;
+                                        const hasMatches = hasCorrectPlatform || sameYear || commonGenres.length > 0;
 
                                         return (
                                             <div key={`${i}-${g}`} style={{
@@ -662,18 +673,18 @@ export default function App() {
                                                         borderRadius: 14,
                                                         border: ok
                                                             ? "2px solid rgba(16, 185, 129, 0.5)"
-                                                            : hasCorrectPlatform
+                                                            : hasMatches
                                                                 ? "2px solid rgba(245, 158, 11, 0.5)"
                                                                 : "1px solid rgba(255,255,255,0.1)",
                                                         background: ok
                                                             ? "linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(52, 211, 153, 0.1) 100%)"
-                                                            : hasCorrectPlatform
+                                                            : hasMatches
                                                                 ? "linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.1) 100%)"
                                                                 : "rgba(255, 255, 255, 0.03)",
                                                         backdropFilter: "blur(10px)",
                                                         boxShadow: ok
                                                             ? "0 4px 20px rgba(16, 185, 129, 0.3)"
-                                                            : hasCorrectPlatform
+                                                            : hasMatches
                                                                 ? "0 4px 20px rgba(245, 158, 11, 0.2)"
                                                                 : "0 2px 8px rgba(0, 0, 0, 0.2)",
                                                         transition: "all 0.3s ease"
@@ -687,7 +698,7 @@ export default function App() {
                                                                 borderRadius: 10,
                                                                 background: ok
                                                                     ? "linear-gradient(135deg, #10b981 0%, #34d399 100%)"
-                                                                    : hasCorrectPlatform
+                                                                    : hasMatches
                                                                         ? "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)"
                                                                         : "rgba(255,255,255,0.08)",
                                                                 display: "flex",
@@ -695,22 +706,96 @@ export default function App() {
                                                                 justifyContent: "center",
                                                                 fontWeight: 900,
                                                                 fontSize: 15,
-                                                                boxShadow: ok || hasCorrectPlatform ? "0 2px 8px rgba(0, 0, 0, 0.3)" : "none"
+                                                                boxShadow: ok || hasMatches ? "0 2px 8px rgba(0, 0, 0, 0.3)" : "none"
                                                             }}
                                                         >
                                                             {i + 1}
                                                         </div>
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: 700, fontSize: 15 }}>{g}</div>
-                                                            {hasCorrectPlatform && !ok && guessedGame && currentGame && (
+                                                            {!ok && hasMatches && (
                                                                 <div style={{
                                                                     fontSize: 12,
-                                                                    opacity: 0.8,
-                                                                    marginTop: 4,
+                                                                    opacity: 0.9,
+                                                                    marginTop: 6,
                                                                     fontWeight: 600,
-                                                                    color: "#fbbf24"
+                                                                    color: "#fbbf24",
+                                                                    display: "flex",
+                                                                    flexDirection: "column",
+                                                                    gap: 4
                                                                 }}>
-                                                                    🎮 Plateforme commune trouvée !
+                                                                    {sameYear && guessedGame?.year && (
+                                                                        <div style={{
+                                                                            display: "flex",
+                                                                            flexWrap: "wrap",
+                                                                            alignItems: "center",
+                                                                            gap: 6
+                                                                        }}>
+                                                                            <span>📅 Même année :</span>
+                                                                            <span
+                                                                                style={{
+                                                                                    padding: "2px 8px",
+                                                                                    background: "rgba(245, 158, 11, 0.3)",
+                                                                                    border: "1px solid rgba(245, 158, 11, 0.5)",
+                                                                                    borderRadius: 6,
+                                                                                    fontSize: 11,
+                                                                                    fontWeight: 700
+                                                                                }}
+                                                                            >
+                                                                                {guessedGame.year}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
+                                                                    {commonPlatforms.length > 0 && (
+                                                                        <div style={{
+                                                                            display: "flex",
+                                                                            flexWrap: "wrap",
+                                                                            alignItems: "center",
+                                                                            gap: 6
+                                                                        }}>
+                                                                            <span>🎮 Plateforme{commonPlatforms.length > 1 ? 's' : ''} :</span>
+                                                                            {commonPlatforms.map((platform, idx) => (
+                                                                                <span
+                                                                                    key={idx}
+                                                                                    style={{
+                                                                                        padding: "2px 8px",
+                                                                                        background: "rgba(245, 158, 11, 0.3)",
+                                                                                        border: "1px solid rgba(245, 158, 11, 0.5)",
+                                                                                        borderRadius: 6,
+                                                                                        fontSize: 11,
+                                                                                        fontWeight: 700
+                                                                                    }}
+                                                                                >
+                                                                                    {platform}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                    {commonGenres.length > 0 && (
+                                                                        <div style={{
+                                                                            display: "flex",
+                                                                            flexWrap: "wrap",
+                                                                            alignItems: "center",
+                                                                            gap: 6
+                                                                        }}>
+                                                                            <span>🎯 Genre{commonGenres.length > 1 ? 's' : ''} :</span>
+                                                                            {commonGenres.map((genre, idx) => (
+                                                                                <span
+                                                                                    key={idx}
+                                                                                    style={{
+                                                                                        padding: "2px 8px",
+                                                                                        background: "rgba(245, 158, 11, 0.3)",
+                                                                                        border: "1px solid rgba(245, 158, 11, 0.5)",
+                                                                                        borderRadius: 6,
+                                                                                        fontSize: 11,
+                                                                                        fontWeight: 700
+                                                                                    }}
+                                                                                >
+                                                                                    {genre}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -721,132 +806,190 @@ export default function App() {
                                                         fontSize: 20,
                                                         filter: ok ? "drop-shadow(0 0 8px rgba(16, 185, 129, 0.8))" : "none"
                                                     }}>
-                                                        {ok ? "✅" : hasCorrectPlatform ? "🟨" : "❌"}
+                                                        {ok ? "✅" : hasMatches ? "🟨" : "❌"}
                                                     </div>
                                                 </div>
-
-                                                {showHint && currentGame && (
-                                                    <div
-                                                        style={{
-                                                            padding: "16px 18px",
-                                                            borderRadius: 14,
-                                                            border: "2px solid rgba(6, 182, 212, 0.3)",
-                                                            background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(14, 165, 233, 0.1) 100%)",
-                                                            backdropFilter: "blur(10px)",
-                                                            fontSize: 13,
-                                                            boxShadow: "0 4px 20px rgba(6, 182, 212, 0.2)",
-                                                            animation: "scaleIn 0.4s ease-out"
-                                                        }}
-                                                    >
-                                                        <div style={{
-                                                            fontWeight: 800,
-                                                            marginBottom: 10,
-                                                            fontSize: 14,
-                                                            display: "flex",
-                                                            alignItems: "center",
-                                                            gap: 8,
-                                                            color: "#22d3ee"
-                                                        }}>
-                                                            💡 <span>Indice #{(i + 1) / 2}</span>
-                                                        </div>
-                                                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                                            {currentGame.year && (
-                                                                <div style={{
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    gap: 8,
-                                                                    padding: "6px 0"
-                                                                }}>
-                                                                    <span style={{ opacity: 0.8 }}>📅</span>
-                                                                    <span style={{ fontWeight: 600 }}>Année :</span>
-                                                                    <span style={{
-                                                                        padding: "2px 10px",
-                                                                        background: "rgba(6, 182, 212, 0.2)",
-                                                                        borderRadius: 6,
-                                                                        fontWeight: 700
-                                                                    }}>
-                                                                        {currentGame.year}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {currentGame.platforms && currentGame.platforms.length > 0 && (
-                                                                <div style={{
-                                                                    display: "flex",
-                                                                    alignItems: "flex-start",
-                                                                    gap: 8,
-                                                                    padding: "6px 0"
-                                                                }}>
-                                                                    <span style={{ opacity: 0.8 }}>🎮</span>
-                                                                    <div style={{ flex: 1 }}>
-                                                                        <div style={{ fontWeight: 600, marginBottom: 6 }}>Plateformes :</div>
-                                                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                                                            {currentGame.platforms.slice(0, 3).map((p, idx) => (
-                                                                                <span key={idx} style={{
-                                                                                    padding: "4px 10px",
-                                                                                    background: "rgba(6, 182, 212, 0.2)",
-                                                                                    border: "1px solid rgba(6, 182, 212, 0.3)",
-                                                                                    borderRadius: 8,
-                                                                                    fontSize: 12,
-                                                                                    fontWeight: 600
-                                                                                }}>
-                                                                                    {p}
-                                                                                </span>
-                                                                            ))}
-                                                                            {currentGame.platforms.length > 3 && (
-                                                                                <span style={{
-                                                                                    padding: "4px 10px",
-                                                                                    opacity: 0.6,
-                                                                                    fontSize: 12
-                                                                                }}>
-                                                                                    +{currentGame.platforms.length - 3}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                            {currentGame.genres && currentGame.genres.length > 0 && (
-                                                                <div style={{
-                                                                    display: "flex",
-                                                                    alignItems: "flex-start",
-                                                                    gap: 8,
-                                                                    padding: "6px 0"
-                                                                }}>
-                                                                    <span style={{ opacity: 0.8 }}>🎯</span>
-                                                                    <div style={{ flex: 1 }}>
-                                                                        <div style={{ fontWeight: 600, marginBottom: 6 }}>Genres :</div>
-                                                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                                                            {currentGame.genres.slice(0, 2).map((genre, idx) => (
-                                                                                <span key={idx} style={{
-                                                                                    padding: "4px 10px",
-                                                                                    background: "rgba(6, 182, 212, 0.2)",
-                                                                                    border: "1px solid rgba(6, 182, 212, 0.3)",
-                                                                                    borderRadius: 8,
-                                                                                    fontSize: 12,
-                                                                                    fontWeight: 600
-                                                                                }}>
-                                                                                    {genre}
-                                                                                </span>
-                                                                            ))}
-                                                                            {currentGame.genres.length > 2 && (
-                                                                                <span style={{
-                                                                                    padding: "4px 10px",
-                                                                                    opacity: 0.6,
-                                                                                    fontSize: 12
-                                                                                }}>
-                                                                                    +{currentGame.genres.length - 2}
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         );
                                     })}
+
+                                    {/* Indices progressifs après les réponses */}
+                                    {guesses.length >= 2 && !isOver && currentGame && (
+                                        <div style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 10
+                                        }}>
+                                            {/* Indice 1 : Date (après 2 essais) */}
+                                            {guesses.length >= 2 && currentGame.year && (
+                                                <div
+                                                    style={{
+                                                        padding: "16px 18px",
+                                                        borderRadius: 14,
+                                                        border: "2px solid rgba(6, 182, 212, 0.3)",
+                                                        background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(14, 165, 233, 0.1) 100%)",
+                                                        backdropFilter: "blur(10px)",
+                                                        fontSize: 13,
+                                                        boxShadow: "0 4px 20px rgba(6, 182, 212, 0.2)",
+                                                        animation: "scaleIn 0.4s ease-out"
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        fontWeight: 800,
+                                                        marginBottom: 10,
+                                                        fontSize: 14,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        color: "#22d3ee"
+                                                    }}>
+                                                        💡 <span>Indice #1</span>
+                                                    </div>
+                                                    <div style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        padding: "6px 0"
+                                                    }}>
+                                                        <span style={{ opacity: 0.8 }}>📅</span>
+                                                        <span style={{ fontWeight: 600 }}>Année de sortie :</span>
+                                                        <span style={{
+                                                            padding: "2px 10px",
+                                                            background: "rgba(6, 182, 212, 0.2)",
+                                                            borderRadius: 6,
+                                                            fontWeight: 700
+                                                        }}>
+                                                            {currentGame.year}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Indice 2 : Plateformes (après 3 essais) */}
+                                            {guesses.length >= 3 && currentGame.platforms && currentGame.platforms.length > 0 && (
+                                                <div
+                                                    style={{
+                                                        padding: "16px 18px",
+                                                        borderRadius: 14,
+                                                        border: "2px solid rgba(6, 182, 212, 0.3)",
+                                                        background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(14, 165, 233, 0.1) 100%)",
+                                                        backdropFilter: "blur(10px)",
+                                                        fontSize: 13,
+                                                        boxShadow: "0 4px 20px rgba(6, 182, 212, 0.2)",
+                                                        animation: "scaleIn 0.4s ease-out"
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        fontWeight: 800,
+                                                        marginBottom: 10,
+                                                        fontSize: 14,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        color: "#22d3ee"
+                                                    }}>
+                                                        💡 <span>Indice #2</span>
+                                                    </div>
+                                                    <div style={{
+                                                        display: "flex",
+                                                        alignItems: "flex-start",
+                                                        gap: 8,
+                                                        padding: "6px 0"
+                                                    }}>
+                                                        <span style={{ opacity: 0.8 }}>🎮</span>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 600, marginBottom: 6 }}>Plateformes :</div>
+                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                                                {currentGame.platforms.slice(0, 3).map((p, idx) => (
+                                                                    <span key={idx} style={{
+                                                                        padding: "4px 10px",
+                                                                        background: "rgba(6, 182, 212, 0.2)",
+                                                                        border: "1px solid rgba(6, 182, 212, 0.3)",
+                                                                        borderRadius: 8,
+                                                                        fontSize: 12,
+                                                                        fontWeight: 600
+                                                                    }}>
+                                                                        {p}
+                                                                    </span>
+                                                                ))}
+                                                                {currentGame.platforms.length > 3 && (
+                                                                    <span style={{
+                                                                        padding: "4px 10px",
+                                                                        opacity: 0.6,
+                                                                        fontSize: 12
+                                                                    }}>
+                                                                        +{currentGame.platforms.length - 3}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Indice 3 : Genres (après 4 essais) */}
+                                            {guesses.length >= 4 && currentGame.genres && currentGame.genres.length > 0 && (
+                                                <div
+                                                    style={{
+                                                        padding: "16px 18px",
+                                                        borderRadius: 14,
+                                                        border: "2px solid rgba(6, 182, 212, 0.3)",
+                                                        background: "linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(14, 165, 233, 0.1) 100%)",
+                                                        backdropFilter: "blur(10px)",
+                                                        fontSize: 13,
+                                                        boxShadow: "0 4px 20px rgba(6, 182, 212, 0.2)",
+                                                        animation: "scaleIn 0.4s ease-out"
+                                                    }}
+                                                >
+                                                    <div style={{
+                                                        fontWeight: 800,
+                                                        marginBottom: 10,
+                                                        fontSize: 14,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: 8,
+                                                        color: "#22d3ee"
+                                                    }}>
+                                                        💡 <span>Indice #3</span>
+                                                    </div>
+                                                    <div style={{
+                                                        display: "flex",
+                                                        alignItems: "flex-start",
+                                                        gap: 8,
+                                                        padding: "6px 0"
+                                                    }}>
+                                                        <span style={{ opacity: 0.8 }}>🎯</span>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 600, marginBottom: 6 }}>Genres :</div>
+                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                                                {currentGame.genres.slice(0, 2).map((genre, idx) => (
+                                                                    <span key={idx} style={{
+                                                                        padding: "4px 10px",
+                                                                        background: "rgba(6, 182, 212, 0.2)",
+                                                                        border: "1px solid rgba(6, 182, 212, 0.3)",
+                                                                        borderRadius: 8,
+                                                                        fontSize: 12,
+                                                                        fontWeight: 600
+                                                                    }}>
+                                                                        {genre}
+                                                                    </span>
+                                                                ))}
+                                                                {currentGame.genres.length > 2 && (
+                                                                    <span style={{
+                                                                        padding: "4px 10px",
+                                                                        opacity: 0.6,
+                                                                        fontSize: 12
+                                                                    }}>
+                                                                        +{currentGame.genres.length - 2}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
