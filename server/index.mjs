@@ -61,24 +61,40 @@ async function getAppToken() {
     return token;
 }
 
-async function igdbGames(query) {
+async function igdbGames(query, retries = 3) {
     const token = await getAppToken();
-    const res = await fetch("https://api.igdb.com/v4/games", {
-        method: "POST",
-        headers: {
-            "Client-ID": clientId,
-            "Authorization": `Bearer ${token}`,
-            "Content-Type": "text/plain"
-        },
-        body: query
-    });
 
-    const text = await res.text();
-    if (!res.ok) {
-        console.error("❌ Erreur IGDB:", res.status, text);
-        throw new Error(`IGDB HTTP ${res.status} ${text}`);
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+            const res = await fetch("https://api.igdb.com/v4/games", {
+                method: "POST",
+                headers: {
+                    "Client-ID": clientId,
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "text/plain"
+                },
+                body: query
+            });
+
+            const text = await res.text();
+
+            if (res.status === 429 && attempt < retries) {
+                const waitTime = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+                console.warn(`⚠️ Rate limit atteint, attente de ${waitTime}ms avant retry ${attempt + 1}/${retries}...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                continue;
+            }
+
+            if (!res.ok) {
+                console.error("❌ Erreur IGDB:", res.status, text);
+                throw new Error(`IGDB HTTP ${res.status} ${text}`);
+            }
+
+            return JSON.parse(text);
+        } catch (error) {
+            if (attempt === retries) throw error;
+        }
     }
-    return JSON.parse(text);
 }
 
 function coverUrlFromImageId(imageId, size = "cover_big") {
@@ -105,7 +121,7 @@ async function ensurePopularPool() {
 
     const query = `
 fields id,name,first_release_date,follows,total_rating_count,cover.url,platforms.name,genres.name;
-where cover != null;
+where cover != null & first_release_date >= 1262304000 & total_rating_count > 10;
 sort total_rating_count desc;
 limit 500;
 `;
@@ -136,11 +152,19 @@ limit 500;
 
         popularPool = pool;
         popularPoolMap = new Map(pool.map(g => [g.id, g]));
-        popularPoolExpiresAt = now + 6 * 60 * 60 * 1000;
+        popularPoolExpiresAt = now + 12 * 60 * 60 * 1000; // Cache de 12 heures
 
         return popularPool;
     } catch (error) {
         console.error("❌ Erreur lors du chargement du pool:", error);
+
+        // Si on a déjà un pool en cache (même expiré), le réutiliser
+        if (popularPool.length > 0) {
+            console.warn("⚠️ Réutilisation du pool en cache malgré l'expiration");
+            popularPoolExpiresAt = now + 30 * 60 * 1000; // Retry dans 30 minutes
+            return popularPool;
+        }
+
         throw error;
     }
 }
