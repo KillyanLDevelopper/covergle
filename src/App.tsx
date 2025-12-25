@@ -647,7 +647,8 @@ export default function App() {
                                         gap: 10
                                     }}
                                 >
-                                    {guesses.map((g, i) => {
+                                    {[...guesses].reverse().map((g, reversedIndex) => {
+                                        const i = guesses.length - 1 - reversedIndex;
                                         const ok = currentGame ? isCorrect(g, currentGame) : false;
                                         const guessedGame = guessedGames.get(g);
                                         const commonPlatforms = currentGame && guessedGame ? getCommonPlatforms(guessedGame, currentGame) : [];
