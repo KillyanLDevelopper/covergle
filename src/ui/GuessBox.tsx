@@ -32,17 +32,19 @@ export function GuessBox({ disabled, onSubmit }: Props) {
         return () => clearTimeout(t);
     }, [q, value, disabled]);
 
-    function submit(v: string, forceValue = false) {
-        const guess = v.trim();
-        if (!guess) return;
-
-        // Si forceValue est true, utiliser la valeur fournie directement
-        // Sinon, si des suggestions existent, prendre le premier jeu
-        if (forceValue) {
-            onSubmit(guess);
-        } else if (items.length > 0) {
+    function submit(gameTitle?: string) {
+        // Si un titre de jeu est fourni explicitement (clic sur suggestion), l'utiliser
+        if (gameTitle) {
+            onSubmit(gameTitle);
+        }
+        // Sinon, si des suggestions existent, prendre le premier
+        else if (items.length > 0) {
             onSubmit(items[0].title);
-        } else {
+        }
+        // Sinon, utiliser la valeur tapée
+        else {
+            const guess = value.trim();
+            if (!guess) return;
             onSubmit(guess);
         }
 
@@ -65,7 +67,7 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                     }}
 
                     onKeyDown={e => {
-                        if (e.key === "Enter") submit(value, false); // forceValue=false pour prendre le premier
+                        if (e.key === "Enter") submit(); // Pas de paramètre = utilise la logique automatique
                     }}
                     placeholder="Tape le nom du jeu…"
                     style={{
@@ -80,7 +82,7 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                 />
                 <button
                     disabled={disabled}
-                    onClick={() => submit(value, false)} // forceValue=false pour prendre le premier de la liste
+                    onClick={() => submit()} // Pas de paramètre = utilise la logique automatique
                     style={{
                         padding: "12px 14px",
                         borderRadius: 12,
@@ -109,7 +111,7 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                             key={g.id}
                             onMouseDown={e => {
                                 e.preventDefault();
-                                submit(g.title, true); // forceValue=true pour utiliser le titre cliqué
+                                submit(g.title); // Passe le titre du jeu cliqué
                             }}
                             style={{
                                 width: "100%",
