@@ -647,7 +647,8 @@ export default function App() {
                                         gap: 10
                                     }}
                                 >
-                                    {[...guesses].map((g, i) => {
+                                    {[...guesses].reverse().map((g, i) => {
+                                        const actualIndex = guesses.length - i - 1; // Index réel dans le tableau non inversé
                                         const ok = currentGame ? isCorrect(g, currentGame) : false;
                                         const guessedGame = guessedGames.get(g);
                                         const commonPlatforms = currentGame && guessedGame ? getCommonPlatforms(guessedGame, currentGame) : [];
@@ -657,7 +658,7 @@ export default function App() {
                                         const hasMatches = hasCorrectPlatform || sameYear || commonGenres.length > 0;
 
                                         return (
-                                            <div key={`${i}-${g}`} style={{
+                                            <div key={`${actualIndex}-${g}`} style={{
                                                 display: "flex",
                                                 flexDirection: "column",
                                                 gap: 10,
@@ -709,7 +710,7 @@ export default function App() {
                                                                 boxShadow: ok || hasMatches ? "0 2px 8px rgba(0, 0, 0, 0.3)" : "none"
                                                             }}
                                                         >
-                                                            {i + 1}
+                                                            {actualIndex + 1}
                                                         </div>
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: 700, fontSize: 15 }}>{g}</div>
