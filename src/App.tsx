@@ -341,11 +341,18 @@ export default function App() {
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
-                            fontSize: 24,
-                            fontWeight: 800,
-                            boxShadow: "0 4px 15px rgba(124, 58, 237, 0.4)"
+                            boxShadow: "0 4px 15px rgba(124, 58, 237, 0.4)",
+                            overflow: "hidden"
                         }}>
-                            🎮
+                            <img
+                                src="/img/Covergle.png"
+                                alt="Covergle Logo"
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover"
+                                }}
+                            />
                         </div>
                         <div>
                             <div style={{
