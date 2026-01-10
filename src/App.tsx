@@ -138,6 +138,12 @@ export default function App() {
     // État pour gérer l'expansion des carrés (plateformes et genres)
     const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
+    // État pour le pop-up de victoire
+    const [showWinPopup, setShowWinPopup] = useState(false);
+
+    // État pour le pop-up de défaite
+    const [showLosePopup, setShowLosePopup] = useState(false);
+
     const currentGame = mode === "daily" ? dailyGame : infiniteGame;
     const guesses = mode === "daily" ? dailyState.guesses : infGuesses;
     const isOver = mode === "daily" ? dailyState.isOver : infOver;
@@ -265,6 +271,15 @@ export default function App() {
             setInfWin(win);
             if (over) applyEnd(win, next.length);
         }
+
+        // Ouvrir le pop-up si victoire
+        if (win) {
+            setTimeout(() => setShowWinPopup(true), 500);
+        }
+        // Ouvrir le pop-up si défaite
+        if (over && !win) {
+            setTimeout(() => setShowLosePopup(true), 500);
+        }
     }
 
     function resetInfinite() {
@@ -274,10 +289,18 @@ export default function App() {
         setInfOver(false);
         setInfWin(false);
         setGuessedGames(new Map());
+        setShowWinPopup(false);
+        setShowLosePopup(false);
     }
 
     const stats = useMemo(() => loadStats(), [mode, dailyState.isOver, infOver]);
     const title = mode === "daily" ? "Daily" : "Infinite";
+
+    // Fermer le pop-up quand le mode change
+    useEffect(() => {
+        setShowWinPopup(false);
+        setShowLosePopup(false);
+    }, [mode]);
 
     return (
         <div style={{
@@ -650,7 +673,8 @@ export default function App() {
                                         gap: 10
                                     }}
                                 >
-                                    {guesses.map((g, actualIndex) => {
+                                    {[...guesses].reverse().map((g, i) => {
+                                        const actualIndex = guesses.length - 1 - i; // Index réel dans le tableau
                                         const ok = currentGame ? isCorrect(g, currentGame) : false;
                                         const guessedGame = guessedGames.get(g);
                                         const commonPlatforms = currentGame && guessedGame ? getCommonPlatforms(guessedGame, currentGame) : [];
@@ -800,7 +824,7 @@ export default function App() {
                                                                         ) : (
                                                                             <>
                                                                                 {guessedGame?.platforms?.[0] || 'N/A'}
-                                                                                {hasManyPlatforms && ` +${guessedGame.platforms.length - 1}`}
+                                                                                {hasManyPlatforms && ` +${(guessedGame.platforms?.length || 1) - 1}`}
                                                                             </>
                                                                         )}
                                                                     </div>
@@ -877,7 +901,7 @@ export default function App() {
                                                                         ) : (
                                                                             <>
                                                                                 {guessedGame?.genres?.[0] || 'N/A'}
-                                                                                {hasManyGenres && ` +${guessedGame.genres.length - 1}`}
+                                                                                {hasManyGenres && ` +${(guessedGame.genres?.length || 1) - 1}`}
                                                                             </>
                                                                         )}
                                                                     </div>
@@ -1149,6 +1173,504 @@ export default function App() {
                     </div>
                 </footer>
             </div>
+
+            {/* Pop-up de victoire */}
+            {showWinPopup && currentGame && isWin && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0, 0, 0, 0.85)",
+                        backdropFilter: "blur(8px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 9999,
+                        animation: "fadeIn 0.3s ease-out",
+                        padding: 20
+                    }}
+                    onClick={() => setShowWinPopup(false)}
+                >
+                    <div
+                        style={{
+                            background: "linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(52, 211, 153, 0.95) 100%)",
+                            borderRadius: 24,
+                            padding: "32px",
+                            maxWidth: 500,
+                            width: "100%",
+                            boxShadow: "0 20px 60px rgba(16, 185, 129, 0.5)",
+                            animation: "scaleIn 0.4s ease-out",
+                            border: "2px solid rgba(255, 255, 255, 0.2)"
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div style={{
+                            textAlign: "center",
+                            marginBottom: 24
+                        }}>
+                            <div style={{
+                                fontSize: 48,
+                                marginBottom: 8,
+                                animation: "pulse 1s ease-in-out infinite"
+                            }}>
+                                🎉
+                            </div>
+                            <h2 style={{
+                                fontSize: 32,
+                                fontWeight: 900,
+                                color: "white",
+                                marginBottom: 8,
+                                textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)"
+                            }}>
+                                Félicitations !
+                            </h2>
+                            <div style={{
+                                fontSize: 16,
+                                color: "rgba(255, 255, 255, 0.9)",
+                                fontWeight: 600
+                            }}>
+                                Vous avez trouvé le jeu en {guesses.length} essai{guesses.length > 1 ? 's' : ''} !
+                            </div>
+                        </div>
+
+                        {/* Cover non pixelisée */}
+                        <div style={{
+                            width: "100%",
+                            display: "flex",
+                            justifyContent: "center",
+                            marginBottom: 20
+                        }}>
+                            <div style={{
+                                width: 264,
+                                height: 352,
+                                borderRadius: 16,
+                                overflow: "hidden",
+                                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.4)",
+                                border: "3px solid rgba(255, 255, 255, 0.3)"
+                            }}>
+                                <img
+                                    src={currentGame.cover || ''}
+                                    alt={currentGame.title}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover"
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Titre du jeu */}
+                        <div style={{
+                            textAlign: "center",
+                            marginBottom: 24
+                        }}>
+                            <div style={{
+                                fontSize: 24,
+                                fontWeight: 800,
+                                color: "white",
+                                textShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+                                marginBottom: 8
+                            }}>
+                                {currentGame.title}
+                            </div>
+                            {currentGame.year && (
+                                <div style={{
+                                    fontSize: 14,
+                                    color: "rgba(255, 255, 255, 0.8)",
+                                    fontWeight: 600
+                                }}>
+                                    📅 {currentGame.year}
+                                    {currentGame.platforms && currentGame.platforms.length > 0 && (
+                                        <span> • 🎮 {currentGame.platforms.slice(0, 2).join(', ')}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Boutons d'action */}
+                        <div style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                            width: "100%"
+                        }}>
+                            {mode === "infinite" && (
+                                <button
+                                    onClick={() => {
+                                        resetInfinite();
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        padding: "14px 24px",
+                                        borderRadius: 12,
+                                        border: "2px solid rgba(6, 182, 212, 0.5)",
+                                        background: "linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)",
+                                        color: "white",
+                                        cursor: "pointer",
+                                        fontWeight: 700,
+                                        fontSize: 16,
+                                        transition: "all 0.3s ease",
+                                        backdropFilter: "blur(10px)",
+                                        boxShadow: "0 4px 15px rgba(6, 182, 212, 0.3)"
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.5) 0%, rgba(34, 211, 238, 0.4) 100%)";
+                                        e.currentTarget.style.transform = "translateY(-2px)";
+                                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(6, 182, 212, 0.4)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                        e.currentTarget.style.boxShadow = "0 4px 15px rgba(6, 182, 212, 0.3)";
+                                    }}
+                                >
+                                    ♾️ Rejouer (Infinite)
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setShowWinPopup(false);
+                                    if (mode === "infinite") {
+                                        setMode("daily");
+                                    } else {
+                                        setMode("infinite");
+                                    }
+                                }}
+                                style={{
+                                    width: "100%",
+                                    padding: "14px 24px",
+                                    borderRadius: 12,
+                                    border: mode === "infinite"
+                                        ? "2px solid rgba(124, 58, 237, 0.5)"
+                                        : "2px solid rgba(6, 182, 212, 0.5)",
+                                    background: mode === "infinite"
+                                        ? "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)"
+                                        : "linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(34, 211, 238, 0.2) 100%)",
+                                    color: "white",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    fontSize: 16,
+                                    transition: "all 0.3s ease",
+                                    backdropFilter: "blur(10px)",
+                                    boxShadow: mode === "infinite"
+                                        ? "0 4px 15px rgba(124, 58, 237, 0.3)"
+                                        : "0 4px 15px rgba(6, 182, 212, 0.3)"
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (mode === "infinite") {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(124, 58, 237, 0.4) 0%, rgba(167, 139, 250, 0.3) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(124, 58, 237, 0.4)";
+                                    } else {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(6, 182, 212, 0.4)";
+                                    }
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (mode === "infinite") {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 4px 15px rgba(124, 58, 237, 0.3)";
+                                    } else {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(34, 211, 238, 0.2) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 4px 15px rgba(6, 182, 212, 0.3)";
+                                    }
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                }}
+                            >
+                                {mode === "infinite" ? "📅 Aller au Daily" : "♾️ Aller à l'Infinite"}
+                            </button>
+
+                            <button
+                                onClick={() => setShowWinPopup(false)}
+                                style={{
+                                    width: "100%",
+                                    padding: "14px 24px",
+                                    borderRadius: 12,
+                                    border: "2px solid rgba(255, 255, 255, 0.2)",
+                                    background: "rgba(255, 255, 255, 0.1)",
+                                    color: "white",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    fontSize: 16,
+                                    transition: "all 0.3s ease",
+                                    backdropFilter: "blur(10px)"
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.2)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "none";
+                                }}
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Pop-up de défaite */}
+            {showLosePopup && currentGame && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0, 0, 0, 0.8)",
+                        backdropFilter: "blur(8px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 9999,
+                        animation: "fadeIn 0.3s ease-out",
+                        padding: 20
+                    }}
+                    onClick={() => setShowLosePopup(false)}
+                >
+                    <div
+                        style={{
+                            background: "linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)",
+                            borderRadius: 24,
+                            padding: "32px",
+                            maxWidth: 500,
+                            width: "100%",
+                            boxShadow: "0 20px 60px rgba(239, 68, 68, 0.5)",
+                            animation: "scaleIn 0.4s ease-out",
+                            border: "2px solid rgba(255, 255, 255, 0.2)"
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div style={{
+                            textAlign: "center",
+                            marginBottom: 24
+                        }}>
+                            <div style={{
+                                fontSize: 48,
+                                marginBottom: 8,
+                                animation: "pulse 1s ease-in-out infinite"
+                            }}>
+                                😔
+                            </div>
+                            <h2 style={{
+                                fontSize: 32,
+                                fontWeight: 900,
+                                color: "white",
+                                marginBottom: 8,
+                                textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)"
+                            }}>
+                                Perdu !
+                            </h2>
+                            <div style={{
+                                fontSize: 16,
+                                color: "rgba(255, 255, 255, 0.9)",
+                                fontWeight: 600
+                            }}>
+                                Vous n'avez pas trouvé le jeu cette fois...
+                            </div>
+                        </div>
+
+                        {/* Cover non pixelisée */}
+                        <div style={{
+                            width: "100%",
+                            display: "flex",
+                            justifyContent: "center",
+                            marginBottom: 20
+                        }}>
+                            <div style={{
+                                width: 264,
+                                height: 352,
+                                borderRadius: 16,
+                                overflow: "hidden",
+                                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.4)",
+                                border: "3px solid rgba(255, 255, 255, 0.3)"
+                            }}>
+                                <img
+                                    src={currentGame.cover || ''}
+                                    alt={currentGame.title}
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover"
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Titre du jeu */}
+                        <div style={{
+                            textAlign: "center",
+                            marginBottom: 24
+                        }}>
+                            <div style={{
+                                fontSize: 20,
+                                fontWeight: 700,
+                                color: "rgba(255, 255, 255, 0.8)",
+                                marginBottom: 6
+                            }}>
+                                C'était :
+                            </div>
+                            <div style={{
+                                fontSize: 24,
+                                fontWeight: 800,
+                                color: "white",
+                                textShadow: "0 2px 8px rgba(0, 0, 0, 0.3)",
+                                marginBottom: 8
+                            }}>
+                                {currentGame.title}
+                            </div>
+                            {currentGame.year && (
+                                <div style={{
+                                    fontSize: 14,
+                                    color: "rgba(255, 255, 255, 0.8)",
+                                    fontWeight: 600
+                                }}>
+                                    📅 {currentGame.year}
+                                    {currentGame.platforms && currentGame.platforms.length > 0 && (
+                                        <span> • 🎮 {currentGame.platforms.slice(0, 2).join(', ')}</span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Boutons d'action */}
+                        <div style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 12,
+                            width: "100%"
+                        }}>
+                            {mode === "infinite" && (
+                                <button
+                                    onClick={() => {
+                                        resetInfinite();
+                                    }}
+                                    style={{
+                                        width: "100%",
+                                        padding: "14px 24px",
+                                        borderRadius: 12,
+                                        border: "2px solid rgba(6, 182, 212, 0.5)",
+                                        background: "linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)",
+                                        color: "white",
+                                        cursor: "pointer",
+                                        fontWeight: 700,
+                                        fontSize: 16,
+                                        transition: "all 0.3s ease",
+                                        backdropFilter: "blur(10px)",
+                                        boxShadow: "0 4px 15px rgba(6, 182, 212, 0.3)"
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.5) 0%, rgba(34, 211, 238, 0.4) 100%)";
+                                        e.currentTarget.style.transform = "translateY(-2px)";
+                                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(6, 182, 212, 0.4)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                        e.currentTarget.style.boxShadow = "0 4px 15px rgba(6, 182, 212, 0.3)";
+                                    }}
+                                >
+                                    ♾️ Réessayer (Infinite)
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => {
+                                    setShowLosePopup(false);
+                                    if (mode === "infinite") {
+                                        setMode("daily");
+                                    } else {
+                                        setMode("infinite");
+                                    }
+                                }}
+                                style={{
+                                    width: "100%",
+                                    padding: "14px 24px",
+                                    borderRadius: 12,
+                                    border: mode === "infinite"
+                                        ? "2px solid rgba(124, 58, 237, 0.5)"
+                                        : "2px solid rgba(6, 182, 212, 0.5)",
+                                    background: mode === "infinite"
+                                        ? "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)"
+                                        : "linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(34, 211, 238, 0.2) 100%)",
+                                    color: "white",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    fontSize: 16,
+                                    transition: "all 0.3s ease",
+                                    backdropFilter: "blur(10px)",
+                                    boxShadow: mode === "infinite"
+                                        ? "0 4px 15px rgba(124, 58, 237, 0.3)"
+                                        : "0 4px 15px rgba(6, 182, 212, 0.3)"
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (mode === "infinite") {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(124, 58, 237, 0.4) 0%, rgba(167, 139, 250, 0.3) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(124, 58, 237, 0.4)";
+                                    } else {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.4) 0%, rgba(34, 211, 238, 0.3) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(6, 182, 212, 0.4)";
+                                    }
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (mode === "infinite") {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(124, 58, 237, 0.3) 0%, rgba(167, 139, 250, 0.2) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 4px 15px rgba(124, 58, 237, 0.3)";
+                                    } else {
+                                        e.currentTarget.style.background = "linear-gradient(135deg, rgba(6, 182, 212, 0.3) 0%, rgba(34, 211, 238, 0.2) 100%)";
+                                        e.currentTarget.style.boxShadow = "0 4px 15px rgba(6, 182, 212, 0.3)";
+                                    }
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                }}
+                            >
+                                {mode === "infinite" ? "📅 Aller au Daily" : "♾️ Aller à l'Infinite"}
+                            </button>
+
+                            <button
+                                onClick={() => setShowLosePopup(false)}
+                                style={{
+                                    width: "100%",
+                                    padding: "14px 24px",
+                                    borderRadius: 12,
+                                    border: "2px solid rgba(255, 255, 255, 0.2)",
+                                    background: "rgba(255, 255, 255, 0.1)",
+                                    color: "white",
+                                    cursor: "pointer",
+                                    fontWeight: 700,
+                                    fontSize: 16,
+                                    transition: "all 0.3s ease",
+                                    backdropFilter: "blur(10px)"
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.2)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "none";
+                                }}
+                            >
+                                Fermer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
