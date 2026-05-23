@@ -13,6 +13,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const distPath = path.join(__dirname, "..", "public", "dist");
+if (process.env.NODE_ENV === "production") {
+    app.use(express.static(distPath));
+}
+
 const clientId = process.env.TWITCH_CLIENT_ID || "";
 const clientSecret = process.env.TWITCH_CLIENT_SECRET || "";
 const port = Number(process.env.PORT || 5174);
@@ -259,10 +264,24 @@ limit 1;
     }
 });
 
+// Servir l'app frontend en cas de route non-API (SPA routing)
+if (process.env.NODE_ENV === "production") {
+    app.use((req, res, next) => {
+        if (!req.path.startsWith('/api')) {
+            res.sendFile(path.join(distPath, "index.html"));
+        } else {
+            next();
+        }
+    });
+}
+
 app.listen(port, () => {
     console.log(`🚀 Serveur démarré sur http://localhost:${port}`);
     console.log(`📝 Endpoints disponibles:`);
     console.log(`   - GET /api/health`);
     console.log(`   - GET /api/search?q=<query>`);
     console.log(`   - GET /api/game/:id`);
+    if (process.env.NODE_ENV === "production") {
+        console.log(`   - Frontend servi sur http://localhost:${port}`);
+    }
 });
