@@ -32,9 +32,60 @@ Un jeu de devinettes inspiré de Wordle où vous devez identifier un jeu vidéo 
 ## 🚀 Installation et démarrage
 
 ### Prérequis
-- Node.js (v18 ou supérieur)
-- npm ou yarn
+- **Docker & Docker Desktop** (recommandé)
+- Ou Node.js 18+ pour développement sans Docker
 - Credentials IGDB (Twitch Client ID & Secret)
+
+### Obtenir vos credentials
+1. Aller sur https://api-docs.igdb.com/
+2. S'authentifier avec votre compte Twitch
+3. Copier votre **Client ID** et **Client Secret**
+
+---
+
+## 🐳 Option 1 : Avec Docker (Recommandé)
+
+### Configuration
+
+1. **Cloner le projet**
+```bash
+git clone <votre-repo>
+cd covergle
+```
+
+2. **Créer le fichier de configuration**
+
+Créez `docker.env` (basé sur le modèle `docker.env.example`) :
+```env
+TWITCH_CLIENT_ID=votre_client_id
+TWITCH_CLIENT_SECRET=votre_client_secret
+```
+
+⚠️ **IMPORTANT** : `docker.env` est ignoré par git (voir `.gitignore`)
+
+3. **Build l'image Docker**
+```bash
+docker build -t covergle:latest .
+```
+
+4. **Lancer le container**
+
+**En développement** (avec logs) :
+```bash
+docker run -p 5174:5174 --env-file docker.env covergle:latest
+```
+
+**En arrière-plan** :
+```bash
+docker run -p 5174:5174 --env-file docker.env -d covergle:latest
+```
+
+### Accès
+Ouvrez votre navigateur sur **http://localhost:5174**
+
+---
+
+## 💻 Option 2 : Développement local (sans Docker)
 
 ### Configuration
 
@@ -49,35 +100,27 @@ cd covergle
 npm install
 ```
 
-3. **Configurer les credentials IGDB**
+3. **Configurer les credentials**
 
-Créez un fichier `server/.env` avec vos credentials Twitch/IGDB :
+Créez `server/.env` :
 ```env
 TWITCH_CLIENT_ID=votre_client_id
 TWITCH_CLIENT_SECRET=votre_client_secret
 PORT=5174
 ```
 
-> 💡 Pour obtenir vos credentials : https://api-docs.igdb.com/#account-creation
-
-### Démarrage rapide
-
-**Option 1 : Script automatique (Windows)**
-```powershell
-.\start.ps1
-```
-
-**Option 2 : Démarrage manuel**
+4. **Lancer le serveur backend**
 ```bash
-# Terminal 1 : Backend
 cd server
 node index.mjs
+```
 
-# Terminal 2 : Frontend
+5. **Lancer le frontend (nouveau terminal)**
+```bash
 npm run dev
 ```
 
-Ouvrez ensuite votre navigateur sur **http://localhost:5173**
+Ouvrez **http://localhost:5173**
 
 ## 📁 Structure du projet
 
@@ -166,6 +209,77 @@ node tests/test-quick.mjs
 # Débogage avec serveur intégré
 node tests/debug-server.mjs
 ```
+
+---
+
+## 🌐 Déploiement en production
+
+### Prérequis
+- Un serveur loué avec Docker installé
+- Accès SSH au serveur
+
+### Étapes de déploiement
+
+1. **Cloner le repo sur votre serveur**
+```bash
+git clone <votre-repo>
+cd covergle
+```
+
+2. **Créer le fichier docker.env sur le serveur**
+```bash
+# Ne jamais committer docker.env sur git !
+cat > docker.env << EOF
+TWITCH_CLIENT_ID=votre_client_id
+TWITCH_CLIENT_SECRET=votre_client_secret
+EOF
+```
+
+3. **Builder l'image Docker**
+```bash
+docker build -t covergle:latest .
+```
+
+4. **Lancer le container**
+```bash
+# En arrière-plan avec restart automatique
+docker run -d \
+  -p 80:5174 \
+  --name covergle \
+  --restart unless-stopped \
+  --env-file docker.env \
+  covergle:latest
+```
+
+### Accès en production
+Votre site sera accessible sur **http://votre-serveur.com**
+
+### Gestion du container
+```bash
+# Voir les logs
+docker logs -f covergle
+
+# Arrêter le container
+docker stop covergle
+
+# Redémarrer
+docker restart covergle
+
+# Supprimer
+docker rm covergle
+```
+
+---
+
+## 🔐 Sécurité
+
+### Variables d'environnement
+- ✅ **docker.env** : Jamais commité (dans `.gitignore`)
+- ✅ **docker.env.example** : Commité (montre la structure)
+- ⚠️ Ne jamais passer les credentials en ligne de commande
+
+### Credentials IGDB
+Les credentials sont chargés depuis l'environnement du container et ne sont jamais exposés publiquement.
 
 ## 📊 API Backend
 
