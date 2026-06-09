@@ -1,0 +1,33 @@
+services:
+  lebegue_covergle_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lebegue_covergle_app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - PORT=5174
+      - NODE_ENV=production
+    networks:
+      - npm-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    mem_limit: 256m
+    cpus: "0.25"
+    pids_limit: 100
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5174/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  npm-network:
+    external: true
