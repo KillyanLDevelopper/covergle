@@ -20,7 +20,10 @@ RUN npm ci --only=production
 COPY server ./server
 
 # Copier le frontend compilé du stage de build
-COPY --from=frontend-builder /app/dist ./public/dist
+COPY --from=frontend-builder /app/dist ./dist
+
+# Copier les assets statiques AUSSI dans dist pour être sûr
+COPY public ./dist
 
 # Donner les droits à l'utilisateur node (non-root)
 RUN chown -R node:node /app

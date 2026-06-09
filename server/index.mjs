@@ -13,8 +13,10 @@ const app = express();
 app.use(cors({ origin: process.env.ALLOWED_ORIGIN }));
 app.use(express.json());
 
-const distPath = path.join(__dirname, "..", "public", "dist");
+const publicPath = path.join(__dirname, "..", "dist");
+const distPath = path.join(__dirname, "..", "dist");
 if (process.env.NODE_ENV === "production") {
+    // Servir tous les fichiers statiques depuis le dossier dist
     app.use(express.static(distPath));
 }
 
@@ -147,7 +149,8 @@ limit 500;
                 follows: Number(g.follows || 0),
                 platforms: (g.platforms ?? []).map(p => p?.name).filter(Boolean),
                 genres: (g.genres ?? []).map(x => x?.name).filter(Boolean),
-            }));
+            }))
+            .filter(g => g.platforms.length > 0 && g.genres.length > 0);
 
         console.log(`✅ Pool créé avec ${pool.length} jeux valides`);
 

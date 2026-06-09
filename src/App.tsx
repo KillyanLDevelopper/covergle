@@ -144,6 +144,9 @@ export default function App() {
     // État pour le pop-up de défaite
     const [showLosePopup, setShowLosePopup] = useState(false);
 
+    // État pour le pop-up des règles
+    const [showRulesPopup, setShowRulesPopup] = useState(true);
+
     const currentGame = mode === "daily" ? dailyGame : infiniteGame;
     const guesses = mode === "daily" ? dailyState.guesses : infGuesses;
     const isOver = mode === "daily" ? dailyState.isOver : infOver;
@@ -224,6 +227,37 @@ export default function App() {
         setInfiniteGame(pool[randomIndex(pool.length)] ?? null);
     }, [poolReady, pool]);
 
+    // Restaurer les infos des jeux devinés au chargement
+    useEffect(() => {
+        if (!poolReady) return;
+        if (dailyState.guesses.length === 0) return;
+
+        const fetchGuessedGames = async () => {
+            const newGuessedGames = new Map<string, IgdbGame>();
+            
+            for (const guess of dailyState.guesses) {
+                // Chercher dans le pool d'abord
+                let game = pool.find(g => isSameTitle(g.title, guess));
+                
+                // Si pas trouvé, chercher via l'API
+                if (!game) {
+                    const searchResults = await igdbSearch(guess);
+                    if (searchResults.length > 0) {
+                        game = searchResults[0];
+                    }
+                }
+                
+                if (game) {
+                    newGuessedGames.set(guess, game);
+                }
+            }
+            
+            setGuessedGames(newGuessedGames);
+        };
+
+        fetchGuessedGames();
+    }, [dailyState.guesses, poolReady, pool]);
+
     function applyEnd(win: boolean, triesUsed: number) {
         const stats = loadStats();
         stats.played += 1;
@@ -245,7 +279,16 @@ export default function App() {
         if (guesses.some((x) => isSameTitle(x, guess))) return;
 
         // Chercher le jeu deviné dans le pool
-        const guessedGame = pool.find(g => isSameTitle(g.title, guess));
+        let guessedGame = pool.find(g => isSameTitle(g.title, guess));
+        
+        // Si pas trouvé dans le pool, rechercher via l'API
+        if (!guessedGame) {
+            const searchResults = await igdbSearch(guess);
+            if (searchResults.length > 0) {
+                guessedGame = searchResults[0];
+            }
+        }
+        
         if (guessedGame) {
             setGuessedGames(prev => new Map(prev).set(guess, guessedGame));
         }
@@ -300,6 +343,7 @@ export default function App() {
     useEffect(() => {
         setShowWinPopup(false);
         setShowLosePopup(false);
+        setShowRulesPopup(false);
     }, [mode]);
 
     return (
@@ -458,7 +502,7 @@ export default function App() {
                             ♾️ Infinite
                         </button>
                         <button
-                            onClick={() => loadPool()}
+                            onClick={() => setShowRulesPopup(true)}
                             style={{
                                 padding: "10px 18px",
                                 borderRadius: 12,
@@ -480,7 +524,7 @@ export default function App() {
                                 e.currentTarget.style.transform = "translateY(0)";
                             }}
                         >
-                            🔄 Recharger
+                            ❓ Règles
                         </button>
                     </div>
                 </header>
@@ -1675,6 +1719,272 @@ export default function App() {
                                 Fermer
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Pop-up des règles */}
+            {showRulesPopup && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "rgba(0, 0, 0, 0.85)",
+                        backdropFilter: "blur(8px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 9999,
+                        animation: "fadeIn 0.3s ease-out",
+                        padding: 20
+                    }}
+                    onClick={() => setShowRulesPopup(false)}
+                >
+                    <div
+                        style={{
+                            background: "linear-gradient(135deg, rgba(124, 58, 237, 0.95) 0%, rgba(167, 139, 250, 0.95) 100%)",
+                            borderRadius: 24,
+                            padding: "32px",
+                            maxWidth: 600,
+                            width: "100%",
+                            boxShadow: "0 20px 60px rgba(124, 58, 237, 0.5)",
+                            animation: "scaleIn 0.4s ease-out",
+                            border: "2px solid rgba(255, 255, 255, 0.2)",
+                            maxHeight: "85vh",
+                            overflowY: "auto"
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div style={{
+                            textAlign: "center",
+                            marginBottom: 24
+                        }}>
+                            <div style={{
+                                fontSize: 48,
+                                marginBottom: 8,
+                                animation: "pulse 1s ease-in-out infinite"
+                            }}>
+                                🎮
+                            </div>
+                            <h2 style={{
+                                fontSize: 32,
+                                fontWeight: 900,
+                                color: "white",
+                                marginBottom: 8,
+                                textShadow: "0 2px 10px rgba(0, 0, 0, 0.3)"
+                            }}>
+                                Bienvenue à Covergle !
+                            </h2>
+                            <div style={{
+                                fontSize: 14,
+                                color: "rgba(255, 255, 255, 0.9)",
+                                fontWeight: 600
+                            }}>
+                                Voici comment jouer
+                            </div>
+                        </div>
+
+                        {/* Contenu des règles */}
+                        <div style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 20,
+                            fontSize: 15,
+                            lineHeight: 1.6,
+                            color: "rgba(255, 255, 255, 0.95)"
+                        }}>
+                            {/* Objectif */}
+                            <div>
+                                <h3 style={{
+                                    fontSize: 18,
+                                    fontWeight: 700,
+                                    marginBottom: 8,
+                                    color: "white"
+                                }}>
+                                    🎯 L'objectif
+                                </h3>
+                                <p style={{ margin: 0 }}>
+                                    Devinez le jeu vidéo à partir de sa couverture, qui se révèle progressivement à chaque essai. Vous avez un maximum de 6 tentatives pour trouver la bonne réponse.
+                                </p>
+                            </div>
+
+                            {/* Système de révélation */}
+                            <div>
+                                <h3 style={{
+                                    fontSize: 18,
+                                    fontWeight: 700,
+                                    marginBottom: 8,
+                                    color: "white"
+                                }}>
+                                    🔍 Le système de révélation
+                                </h3>
+                                <div style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 12
+                                }}>
+                                    <div style={{
+                                        padding: "8px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid rgba(255, 255, 255, 0.3)"
+                                    }}>
+                                        <strong>Essai 1 :</strong> Environ 10% de la couverture
+                                    </div>
+                                    <div style={{
+                                        padding: "8px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid rgba(255, 255, 255, 0.3)"
+                                    }}>
+                                        <strong>Essai 2-5 :</strong> Révélation progressive
+                                    </div>
+                                    <div style={{
+                                        padding: "8px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid rgba(255, 255, 255, 0.3)"
+                                    }}>
+                                        <strong>Essai 6 :</strong> L'image est presque entièrement visible
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Indices de comparaison */}
+                            <div>
+                                <h3 style={{
+                                    fontSize: 18,
+                                    fontWeight: 700,
+                                    marginBottom: 8,
+                                    color: "white"
+                                }}>
+                                    💡 Indices après chaque essai
+                                </h3>
+                                <div style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 10
+                                }}>
+                                    <div style={{
+                                        padding: "10px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid #10b981"
+                                    }}>
+                                        <strong>🟩 Identique :</strong> Votre jeu partage une plateforme, un genre ou une année avec le jeu cible
+                                    </div>
+                                    <div style={{
+                                        padding: "10px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid #f59e0b"
+                                    }}>
+                                        <strong>🟧 Similaire :</strong> Votre jeu a plusieurs points en commun avec le jeu cible
+                                    </div>
+                                    <div style={{
+                                        padding: "10px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid rgba(255, 255, 255, 0.3)"
+                                    }}>
+                                        <strong>⚪ Différent :</strong> Votre jeu n'a rien en commun avec le jeu cible
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Conseils */}
+                            <div>
+                                <h3 style={{
+                                    fontSize: 18,
+                                    fontWeight: 700,
+                                    marginBottom: 8,
+                                    color: "white"
+                                }}>
+                                    💪 Conseils
+                                </h3>
+                                <ul style={{
+                                    margin: 0,
+                                    paddingLeft: 20,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 8
+                                }}>
+                                    <li>Commencez par des jeux populaires ou des franchises bien connues</li>
+                                    <li>Prêtez attention à la couleur des indices pour affiner vos recherches</li>
+                                    <li>Observez la forme générale et les couleurs dominantes de la couverture</li>
+                                    <li>En mode Daily, vous avez un nouveau jeu chaque jour !</li>
+                                </ul>
+                            </div>
+
+                            {/* Modes de jeu */}
+                            <div>
+                                <h3 style={{
+                                    fontSize: 18,
+                                    fontWeight: 700,
+                                    marginBottom: 8,
+                                    color: "white"
+                                }}>
+                                    🕐 Modes de jeu
+                                </h3>
+                                <div style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    gap: 10
+                                }}>
+                                    <div style={{
+                                        padding: "10px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid #7c3aed"
+                                    }}>
+                                        <strong>📅 Daily :</strong> Un nouveau défi chaque jour à minuit. Vous et vos amis jouez au même jeu !
+                                    </div>
+                                    <div style={{
+                                        padding: "10px 12px",
+                                        background: "rgba(0, 0, 0, 0.3)",
+                                        borderRadius: 8,
+                                        borderLeft: "3px solid #06b6d4"
+                                    }}>
+                                        <strong>♾️ Infini :</strong> Jouez autant que vous le souhaitez, sans limite. Un nouveau jeu à chaque victoire !
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Bouton de fermeture */}
+                        <button
+                            onClick={() => setShowRulesPopup(false)}
+                            style={{
+                                width: "100%",
+                                marginTop: 24,
+                                padding: "14px 24px",
+                                borderRadius: 12,
+                                border: "2px solid rgba(255, 255, 255, 0.2)",
+                                background: "rgba(255, 255, 255, 0.1)",
+                                color: "white",
+                                cursor: "pointer",
+                                fontWeight: 700,
+                                fontSize: 16,
+                                transition: "all 0.3s ease",
+                                backdropFilter: "blur(10px)"
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
+                                e.currentTarget.style.transform = "translateY(-2px)";
+                                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.2)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "rgba(255, 255, 255, 0.1)";
+                                e.currentTarget.style.transform = "translateY(0)";
+                                e.currentTarget.style.boxShadow = "none";
+                            }}
+                        >
+                            C'est parti ! 🚀
+                        </button>
                     </div>
                 </div>
             )}
