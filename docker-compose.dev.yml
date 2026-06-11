@@ -1,0 +1,48 @@
+version: '3.8'
+
+networks:
+  covergle-dev:
+    driver: bridge
+
+services:
+  covergle_backend:
+    image: node:22-alpine
+    container_name: covergle_backend_dev
+    working_dir: /app
+    command: sh -c "npm install && node server/index.mjs"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file: docker.env
+    environment:
+      - PORT=5184
+      - NODE_ENV=development
+    ports:
+      - "127.0.0.1:5184:5184"
+    networks:
+      - covergle-dev
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5184/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  covergle_frontend:
+    image: node:22-alpine
+    container_name: covergle_frontend_dev
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - API_URL=http://covergle_backend:5184
+    ports:
+      - "127.0.0.1:5183:5173"
+    networks:
+      - covergle-dev
+    depends_on:
+      covergle_backend:
+        condition: service_healthy
