@@ -12,6 +12,7 @@ import {
 import { CanvasPixelCover } from "./ui/CanvasPixelCover";
 import { GuessBox } from "./ui/GuessBox";
 import { igdbGet, igdbSearch, type IgdbGame } from "./lib/igdb";
+import posthog from "posthog-js";
 
 const MAX_TRIES = 6;
 
@@ -61,9 +62,20 @@ async function resolveGameFromId(id: string, pool: IgdbGame[]) {
     return await igdbGet(id);
 }
 
+function useIsMobile() {
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 520);
+    useEffect(() => {
+        const update = () => setIsMobile(window.innerWidth <= 520);
+        window.addEventListener("resize", update);
+        return () => window.removeEventListener("resize", update);
+    }, []);
+    return isMobile;
+}
+
 export default function App() {
     const [mode, setMode] = useState<Mode>("daily");
-    const coverSize = 320;
+    const isMobile = useIsMobile();
+    const coverSize = isMobile ? Math.min(300, window.innerWidth - 48) : 320;
 
     const dateIso = useMemo(() => isoDateParis(), []);
     const initialDailyState = useMemo(() => loadDailyState(dateIso), [dateIso]);
@@ -94,7 +106,7 @@ export default function App() {
     const [showLosePopup, setShowLosePopup] = useState(false);
 
     // État pour le pop-up des règles
-    const [showRulesPopup, setShowRulesPopup] = useState(() => !localStorage.getItem("covergle_rules_seen"));
+    const [showRulesPopup, setShowRulesPopup] = useState(() => !localStorage.getItem("covergle_rules_seen_v2"));
 
     const currentGame = mode === "daily" ? dailyGame : infiniteGame;
     const guesses = mode === "daily" ? dailyState.guesses : infGuesses;
@@ -264,13 +276,29 @@ export default function App() {
             if (over) applyEnd(win, next.length);
         }
 
-        // Ouvrir le pop-up si victoire
-        if (win) {
-            setTimeout(() => setShowWinPopup(true), 500);
-        }
-        // Ouvrir le pop-up si défaite
-        if (over && !win) {
-            setTimeout(() => setShowLosePopup(true), 500);
+        if (over) {
+            if (win) {
+                posthog.capture("game_won", {
+                    mode,
+                    tries: next.length,
+                    game_title: currentGame.title,
+                    game_year: currentGame.year,
+                });
+                setTimeout(() => setShowWinPopup(true), 500);
+            } else {
+                posthog.capture("game_lost", {
+                    mode,
+                    game_title: currentGame.title,
+                    game_year: currentGame.year,
+                });
+                setTimeout(() => setShowLosePopup(true), 500);
+            }
+        } else {
+            posthog.capture("guess_made", {
+                mode,
+                guess_number: next.length,
+                correct: win,
+            });
         }
     }
 
@@ -357,7 +385,8 @@ export default function App() {
                             }}>
                                 Covergle
                             </div>
-                            <div style={{
+                            {!isMobile && <div style={{
+                                display: "flex",
                                 opacity: 0.7,
                                 fontSize: 13,
                                 fontWeight: 500,
@@ -378,13 +407,13 @@ export default function App() {
                                 {mode === "daily" && <span>· {dateIso}</span>}
                                 {!poolReady && <span>· Chargement…</span>}
                                 {poolReady && poolError && <span style={{ color: "#ef4444" }}>· Erreur</span>}
-                            </div>
+                            </div>}
                         </div>
                     </div>
 
                     <div style={{ display: "flex", gap: 8 }}>
                         <button
-                            onClick={() => setMode("daily")}
+                            onClick={() => { setMode("daily"); posthog.capture("mode_switched", { mode: "daily" }); }}
                             style={{
                                 padding: "10px 18px",
                                 borderRadius: 12,
@@ -413,10 +442,10 @@ export default function App() {
                                 }
                             }}
                         >
-                            📅 Daily
+                            📅{!isMobile && " Daily"}
                         </button>
                         <button
-                            onClick={() => setMode("infinite")}
+                            onClick={() => { setMode("infinite"); posthog.capture("mode_switched", { mode: "infinite" }); }}
                             style={{
                                 padding: "10px 18px",
                                 borderRadius: 12,
@@ -445,7 +474,7 @@ export default function App() {
                                 }
                             }}
                         >
-                            ♾️ Infinite
+                            ♾️{!isMobile && " Infinite"}
                         </button>
                         <button
                             onClick={() => setShowRulesPopup(true)}
@@ -470,7 +499,7 @@ export default function App() {
                                 e.currentTarget.style.transform = "translateY(0)";
                             }}
                         >
-                            ❓ Règles
+                            ❓{!isMobile && " Règles"}
                         </button>
                     </div>
                 </header>
@@ -685,9 +714,8 @@ export default function App() {
                                                 <div
                                                     style={{
                                                         display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent: "space-between",
-                                                        gap: 12,
+                                                        flexDirection: "column",
+                                                        gap: 10,
                                                         padding: "14px 16px",
                                                         borderRadius: 14,
                                                         border: "1px solid rgba(255,255,255,0.1)",
@@ -697,18 +725,20 @@ export default function App() {
                                                         transition: "all 0.3s ease"
                                                     }}
                                                 >
-                                                    <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1 }}>
+                                                    {/* Ligne 1 : numéro + nom */}
+                                                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                                                         <div
                                                             style={{
-                                                                width: 36,
-                                                                height: 36,
+                                                                width: 32,
+                                                                height: 32,
+                                                                flexShrink: 0,
                                                                 borderRadius: 10,
                                                                 background: "rgba(255,255,255,0.08)",
                                                                 display: "flex",
                                                                 alignItems: "center",
                                                                 justifyContent: "center",
                                                                 fontWeight: 900,
-                                                                fontSize: 15
+                                                                fontSize: 14
                                                             }}
                                                         >
                                                             {actualIndex + 1}
@@ -716,13 +746,13 @@ export default function App() {
                                                         <div style={{ fontWeight: 700, fontSize: 15 }}>{g}</div>
                                                     </div>
 
-                                                    {/* Grille de carrés pour les informations */}
-                                                    <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
+                                                    {/* Ligne 2 : carrés d'info */}
+                                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                                         {/* Carré Année */}
                                                         <div
                                                             style={{
                                                                 minWidth: 70,
-                                                                minHeight: 60,
+                                                                minHeight: 56,
                                                                 padding: "8px 10px",
                                                                 borderRadius: 10,
                                                                 border: `2px solid ${yearColor}`,
@@ -754,8 +784,9 @@ export default function App() {
                                                         {/* Carré Plateforme */}
                                                         <div
                                                             style={{
-                                                                minWidth: 110,
-                                                                minHeight: 60,
+                                                                flex: 1,
+                                                                minWidth: 100,
+                                                                minHeight: 56,
                                                                 padding: "8px 10px",
                                                                 borderRadius: 10,
                                                                 border: `2px solid ${platformColor}`,
@@ -794,8 +825,9 @@ export default function App() {
                                                         {/* Carré Genre */}
                                                         <div
                                                             style={{
-                                                                minWidth: 110,
-                                                                minHeight: 60,
+                                                                flex: 1,
+                                                                minWidth: 100,
+                                                                minHeight: 56,
                                                                 padding: "8px 10px",
                                                                 borderRadius: 10,
                                                                 border: `2px solid ${genreColor}`,
@@ -892,6 +924,7 @@ export default function App() {
                                                 } catch {
                                                     alert(text);
                                                 }
+                                                posthog.capture("result_shared", { mode, win: isWin, tries: guesses.length });
                                             }}
                                             style={{
                                                 padding: "12px 20px",
@@ -1865,7 +1898,7 @@ export default function App() {
                         {/* Bouton de fermeture */}
                         <button
                             onClick={() => {
-                                localStorage.setItem("covergle_rules_seen", "1");
+                                localStorage.setItem("covergle_rules_seen_v2", "1");
                                 setShowRulesPopup(false);
                             }}
                             style={{
