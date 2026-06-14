@@ -12,6 +12,7 @@ import {
 import { CanvasPixelCover } from "./ui/CanvasPixelCover";
 import { GuessBox } from "./ui/GuessBox";
 import { igdbGet, igdbSearch, type IgdbGame } from "./lib/igdb";
+import posthog from "posthog-js";
 
 const MAX_TRIES = 6;
 
@@ -35,73 +36,24 @@ function getCommonGenres(guessedGame: IgdbGame | null, targetGame: IgdbGame): st
     return guessedGame.genres.filter(g => targetGame.genres?.includes(g));
 }
 
-function shareGrid(triesUsed: number, win: boolean) {
-    const blocks = ["⬛", "🟫", "🟨", "🟧", "🟩"];
-    const lines: string[] = [];
+function shareText(triesUsed: number, win: boolean, mode: Mode, dateIso: string) {
+    const blocks = ["⬛", "🟫", "🟨", "🟧", "🟧", "🟧"];
+    const emojis: string[] = [];
     for (let i = 0; i < Math.min(triesUsed, MAX_TRIES); i++) {
-        const t = Math.min(blocks.length - 1, Math.floor((i / (MAX_TRIES - 1)) * (blocks.length - 1)));
-        lines.push(Array(6).fill(blocks[t]).join(""));
+        emojis.push(blocks[Math.min(i, blocks.length - 1)]);
     }
-    if (win && triesUsed > 0) lines[lines.length - 1] = Array(6).fill("🟩").join("");
-    return lines.join("\n");
-}
+    if (win && emojis.length > 0) emojis[emojis.length - 1] = "🟩";
 
-function dedupeById(items: IgdbGame[]) {
-    const m = new Map<string, IgdbGame>();
-    for (const x of items) {
-        if (!x?.id) continue;
-        if (!x.cover) continue;
-        m.set(x.id, x);
-    }
-    return Array.from(m.values());
+    const header = `Covergle • ${mode === "daily" ? `Daily ${dateIso}` : "Infinite"}`;
+    const score = win ? `Trouvé en ${triesUsed}/${MAX_TRIES} !` : `Pas trouvé (${MAX_TRIES}/${MAX_TRIES})`;
+    const grid = emojis.join(" ");
+    return `${header}\n${score}\n${grid}`;
 }
 
 async function buildPool(): Promise<IgdbGame[]> {
-    const seeds = [
-        "a",
-        "e",
-        "i",
-        "o",
-        "u",
-        "the",
-        "of",
-        "re",
-        "en",
-        "la",
-        "war",
-        "super",
-        "final",
-        "legend",
-        "mario",
-        "zelda",
-        "pokemon",
-        "call",
-        "duty",
-        "fifa",
-        "ninja",
-        "king",
-        "dark",
-        "red",
-        "blue"
-    ];
-
-    const settled = await Promise.allSettled(seeds.map((s) => igdbSearch(s)));
-    const ok = settled
-        .filter((r) => r.status === "fulfilled")
-        .flatMap((r) => (r as PromiseFulfilledResult<IgdbGame[]>).value);
-
-    const pool = dedupeById(ok);
-
-    if (pool.length >= 200) return pool.slice(0, 1200);
-
-    const extraSeeds = ["game", "world", "story", "night", "star", "chrono", "mega", "street", "need", "speed", "metal", "gear"];
-    const settled2 = await Promise.allSettled(extraSeeds.map((s) => igdbSearch(s)));
-    const ok2 = settled2
-        .filter((r) => r.status === "fulfilled")
-        .flatMap((r) => (r as PromiseFulfilledResult<IgdbGame[]>).value);
-
-    const pool2 = dedupeById(pool.concat(ok2));
-    return pool2.slice(0, 1200);
+    const res = await fetch("/api/pool");
+    if (!res.ok) throw new Error(`/api/pool HTTP ${res.status}`);
+    return res.json();
 }
 
 async function resolveGameFromId(id: string, pool: IgdbGame[]) {
@@ -110,8 +62,20 @@ async function resolveGameFromId(id: string, pool: IgdbGame[]) {
     return await igdbGet(id);
 }
 
+function useIsMobile() {
+    const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 520);
+    useEffect(() => {
+        const update = () => setIsMobile(window.innerWidth <= 520);
+        window.addEventListener("resize", update);
+        return () => window.removeEventListener("resize", update);
+    }, []);
+    return isMobile;
+}
+
 export default function App() {
     const [mode, setMode] = useState<Mode>("daily");
+    const isMobile = useIsMobile();
+    const coverSize = isMobile ? Math.min(300, window.innerWidth - 48) : 320;
 
     const dateIso = useMemo(() => isoDateParis(), []);
     const initialDailyState = useMemo(() => loadDailyState(dateIso), [dateIso]);
@@ -135,9 +99,6 @@ export default function App() {
     // Stocke les jeux devinés pour la comparaison des plateformes
     const [guessedGames, setGuessedGames] = useState<Map<string, IgdbGame>>(new Map());
 
-    // État pour gérer l'expansion des carrés (plateformes et genres)
-    const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
-
     // État pour le pop-up de victoire
     const [showWinPopup, setShowWinPopup] = useState(false);
 
@@ -145,7 +106,7 @@ export default function App() {
     const [showLosePopup, setShowLosePopup] = useState(false);
 
     // État pour le pop-up des règles
-    const [showRulesPopup, setShowRulesPopup] = useState(true);
+    const [showRulesPopup, setShowRulesPopup] = useState(() => !localStorage.getItem("covergle_rules_seen_v2"));
 
     const currentGame = mode === "daily" ? dailyGame : infiniteGame;
     const guesses = mode === "daily" ? dailyState.guesses : infGuesses;
@@ -315,13 +276,29 @@ export default function App() {
             if (over) applyEnd(win, next.length);
         }
 
-        // Ouvrir le pop-up si victoire
-        if (win) {
-            setTimeout(() => setShowWinPopup(true), 500);
-        }
-        // Ouvrir le pop-up si défaite
-        if (over && !win) {
-            setTimeout(() => setShowLosePopup(true), 500);
+        if (over) {
+            if (win) {
+                posthog.capture("game_won", {
+                    mode,
+                    tries: next.length,
+                    game_title: currentGame.title,
+                    game_year: currentGame.year,
+                });
+                setTimeout(() => setShowWinPopup(true), 500);
+            } else {
+                posthog.capture("game_lost", {
+                    mode,
+                    game_title: currentGame.title,
+                    game_year: currentGame.year,
+                });
+                setTimeout(() => setShowLosePopup(true), 500);
+            }
+        } else {
+            posthog.capture("guess_made", {
+                mode,
+                guess_number: next.length,
+                correct: win,
+            });
         }
     }
 
@@ -343,7 +320,6 @@ export default function App() {
     useEffect(() => {
         setShowWinPopup(false);
         setShowLosePopup(false);
-        setShowRulesPopup(false);
     }, [mode]);
 
     return (
@@ -352,7 +328,6 @@ export default function App() {
             color: "white",
             display: "flex",
             justifyContent: "center",
-            padding: "20px",
             animation: "fadeIn 0.5s ease-out"
         }}>
             <div style={{
@@ -410,11 +385,11 @@ export default function App() {
                             }}>
                                 Covergle
                             </div>
-                            <div style={{
+                            {!isMobile && <div style={{
+                                display: "flex",
                                 opacity: 0.7,
                                 fontSize: 13,
                                 fontWeight: 500,
-                                display: "flex",
                                 alignItems: "center",
                                 gap: 8
                             }}>
@@ -432,13 +407,13 @@ export default function App() {
                                 {mode === "daily" && <span>· {dateIso}</span>}
                                 {!poolReady && <span>· Chargement…</span>}
                                 {poolReady && poolError && <span style={{ color: "#ef4444" }}>· Erreur</span>}
-                            </div>
+                            </div>}
                         </div>
                     </div>
 
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <div style={{ display: "flex", gap: 8 }}>
                         <button
-                            onClick={() => setMode("daily")}
+                            onClick={() => { setMode("daily"); posthog.capture("mode_switched", { mode: "daily" }); }}
                             style={{
                                 padding: "10px 18px",
                                 borderRadius: 12,
@@ -467,10 +442,10 @@ export default function App() {
                                 }
                             }}
                         >
-                            📅 Daily
+                            📅{!isMobile && " Daily"}
                         </button>
                         <button
-                            onClick={() => setMode("infinite")}
+                            onClick={() => { setMode("infinite"); posthog.capture("mode_switched", { mode: "infinite" }); }}
                             style={{
                                 padding: "10px 18px",
                                 borderRadius: 12,
@@ -499,7 +474,7 @@ export default function App() {
                                 }
                             }}
                         >
-                            ♾️ Infinite
+                            ♾️{!isMobile && " Infinite"}
                         </button>
                         <button
                             onClick={() => setShowRulesPopup(true)}
@@ -524,7 +499,7 @@ export default function App() {
                                 e.currentTarget.style.transform = "translateY(0)";
                             }}
                         >
-                            ❓ Règles
+                            ❓{!isMobile && " Règles"}
                         </button>
                     </div>
                 </header>
@@ -540,21 +515,15 @@ export default function App() {
                     boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
                     animation: "scaleIn 0.5s ease-out 0.2s both"
                 }}>
-                    <div style={{
-                        display: "flex",
-                        gap: 28,
-                        alignItems: "flex-start",
-                        flexWrap: "wrap",
-                        justifyContent: "center"
-                    }}>
+                    <div style={{ display: "flex", gap: 28, alignItems: "flex-start", flexWrap: "wrap", justifyContent: "center" }}>
                         {/* Image de couverture avec effet premium */}
                         <div style={{
                             position: "relative",
                             animation: "fadeIn 0.6s ease-out 0.3s both"
                         }}>
                             <div style={{
-                                width: 320,
-                                height: 320,
+                                width: coverSize,
+                                height: coverSize,
                                 borderRadius: 20,
                                 overflow: "hidden",
                                 boxShadow: "0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)",
@@ -562,7 +531,7 @@ export default function App() {
                             }}>
                                 {currentGame?.cover ? (
                                     <>
-                                        <CanvasPixelCover src={currentGame.cover} revealStep={revealStep} size={320} />
+                                        <CanvasPixelCover src={currentGame.cover} revealStep={revealStep} size={coverSize} />
                                         {/* Overlay gradient subtil */}
                                         <div style={{
                                             position: "absolute",
@@ -606,15 +575,8 @@ export default function App() {
                             </div>
                         </div>
 
-                        <div style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 16,
-                            flex: 1,
-                            minWidth: 300,
-                            animation: "fadeIn 0.6s ease-out 0.4s both"
-                        }}>
-                            <GuessBox disabled={isOver} onSubmit={submitGuess} />
+                        <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: 1, minWidth: 300, animation: "fadeIn 0.6s ease-out 0.4s both" }}>
+                            <GuessBox disabled={isOver} guesses={guesses} onSubmit={submitGuess} />
 
                             {/* Légende du système de couleurs avec design amélioré */}
                             <div style={{
@@ -732,10 +694,15 @@ export default function App() {
                                         const sameYear = currentGame && guessedGame ? hasSameYear(guessedGame, currentGame) : false;
                                         const commonGenres = currentGame && guessedGame ? getCommonGenres(guessedGame, currentGame) : [];
 
-                                        // Déterminer les couleurs pour chaque catégorie
+                                        // Vert si toutes les valeurs cibles sont couvertes, jaune si partiel, gris si rien
+                                        const allPlatformsMatch = currentGame?.platforms && currentGame.platforms.length > 0
+                                            && currentGame.platforms.every(p => commonPlatforms.includes(p));
+                                        const allGenresMatch = currentGame?.genres && currentGame.genres.length > 0
+                                            && currentGame.genres.every(g => commonGenres.includes(g));
+
                                         const yearColor = ok || sameYear ? "#10b981" : "rgba(255,255,255,0.15)";
-                                        const platformColor = ok || commonPlatforms.length > 0 ? (ok ? "#10b981" : "#f59e0b") : "rgba(255,255,255,0.15)";
-                                        const genreColor = ok || commonGenres.length > 0 ? (ok ? "#10b981" : "#f59e0b") : "rgba(255,255,255,0.15)";
+                                        const platformColor = ok || allPlatformsMatch ? "#10b981" : commonPlatforms.length > 0 ? "#f59e0b" : "rgba(255,255,255,0.15)";
+                                        const genreColor = ok || allGenresMatch ? "#10b981" : commonGenres.length > 0 ? "#f59e0b" : "rgba(255,255,255,0.15)";
 
                                         return (
                                             <div key={`${actualIndex}-${g}`} style={{
@@ -747,9 +714,8 @@ export default function App() {
                                                 <div
                                                     style={{
                                                         display: "flex",
-                                                        alignItems: "center",
-                                                        justifyContent: "space-between",
-                                                        gap: 12,
+                                                        flexDirection: "column",
+                                                        gap: 10,
                                                         padding: "14px 16px",
                                                         borderRadius: 14,
                                                         border: "1px solid rgba(255,255,255,0.1)",
@@ -759,18 +725,20 @@ export default function App() {
                                                         transition: "all 0.3s ease"
                                                     }}
                                                 >
-                                                    <div style={{ display: "flex", gap: 12, alignItems: "center", flex: 1 }}>
+                                                    {/* Ligne 1 : numéro + nom */}
+                                                    <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                                                         <div
                                                             style={{
-                                                                width: 36,
-                                                                height: 36,
+                                                                width: 32,
+                                                                height: 32,
+                                                                flexShrink: 0,
                                                                 borderRadius: 10,
                                                                 background: "rgba(255,255,255,0.08)",
                                                                 display: "flex",
                                                                 alignItems: "center",
                                                                 justifyContent: "center",
                                                                 fontWeight: 900,
-                                                                fontSize: 15
+                                                                fontSize: 14
                                                             }}
                                                         >
                                                             {actualIndex + 1}
@@ -778,13 +746,13 @@ export default function App() {
                                                         <div style={{ fontWeight: 700, fontSize: 15 }}>{g}</div>
                                                     </div>
 
-                                                    {/* Grille de carrés pour les informations */}
-                                                    <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
+                                                    {/* Ligne 2 : carrés d'info */}
+                                                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                                                         {/* Carré Année */}
                                                         <div
                                                             style={{
                                                                 minWidth: 70,
-                                                                minHeight: 60,
+                                                                minHeight: 56,
                                                                 padding: "8px 10px",
                                                                 borderRadius: 10,
                                                                 border: `2px solid ${yearColor}`,
@@ -803,162 +771,97 @@ export default function App() {
                                                             }}
                                                         >
                                                             <div style={{ fontSize: 9, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>📅 Année</div>
-                                                            <div style={{ fontSize: 13, fontWeight: 800 }}>{guessedGame?.year || 'N/A'}</div>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 13, fontWeight: 800 }}>
+                                                                {guessedGame?.year || 'N/A'}
+                                                                {!ok && guessedGame?.year && currentGame?.year && (
+                                                                    <span style={{ fontSize: 11 }}>
+                                                                        {currentGame.year > guessedGame.year ? '▲' : '▼'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </div>
 
                                                         {/* Carré Plateforme */}
-                                                        {(() => {
-                                                            const platformKey = `platform-${actualIndex}-${g}`;
-                                                            const isExpanded = expandedCards.has(platformKey);
-                                                            const hasManyPlatforms = guessedGame?.platforms && guessedGame.platforms.length > 1;
-
-                                                            return (
-                                                                <div
-                                                                    onClick={() => {
-                                                                        if (hasManyPlatforms) {
-                                                                            setExpandedCards(prev => {
-                                                                                const next = new Set(prev);
-                                                                                if (next.has(platformKey)) {
-                                                                                    next.delete(platformKey);
-                                                                                } else {
-                                                                                    next.add(platformKey);
-                                                                                }
-                                                                                return next;
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    style={{
-                                                                        minWidth: isExpanded ? 180 : 110,
-                                                                        maxWidth: isExpanded ? 250 : 110,
-                                                                        minHeight: 60,
-                                                                        padding: "8px 10px",
-                                                                        borderRadius: 10,
-                                                                        border: `2px solid ${platformColor}`,
-                                                                        background: ok || commonPlatforms.length > 0
-                                                                            ? `linear-gradient(135deg, ${platformColor} 0%, ${platformColor}cc 100%)`
-                                                                            : "rgba(255,255,255,0.05)",
-                                                                        display: "flex",
-                                                                        flexDirection: "column",
-                                                                        alignItems: "center",
-                                                                        justifyContent: "center",
-                                                                        fontWeight: 700,
-                                                                        fontSize: 10,
-                                                                        boxShadow: ok || commonPlatforms.length > 0 ? `0 2px 8px ${platformColor}66` : "none",
-                                                                        transition: "all 0.3s ease",
-                                                                        gap: 4,
-                                                                        cursor: hasManyPlatforms ? "pointer" : "default"
-                                                                    }}
-                                                                    onMouseEnter={(e) => {
-                                                                        if (hasManyPlatforms) {
-                                                                            e.currentTarget.style.transform = "scale(1.02)";
-                                                                        }
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        if (hasManyPlatforms) {
-                                                                            e.currentTarget.style.transform = "scale(1)";
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    <div style={{ fontSize: 9, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>🎮 Plateforme</div>
-                                                                    <div style={{ fontSize: 11, fontWeight: 800, textAlign: "center", lineHeight: 1.3 }}>
-                                                                        {isExpanded ? (
-                                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center" }}>
-                                                                                {guessedGame?.platforms?.map((p, idx) => (
-                                                                                    <span key={idx} style={{
-                                                                                        fontSize: 9,
-                                                                                        background: "rgba(0,0,0,0.2)",
-                                                                                        padding: "2px 5px",
-                                                                                        borderRadius: 4
-                                                                                    }}>{p}</span>
-                                                                                ))}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <>
-                                                                                {guessedGame?.platforms?.[0] || 'N/A'}
-                                                                                {hasManyPlatforms && ` +${(guessedGame.platforms?.length || 1) - 1}`}
-                                                                            </>
-                                                                        )}
+                                                        <div
+                                                            style={{
+                                                                flex: 1,
+                                                                minWidth: 100,
+                                                                minHeight: 56,
+                                                                padding: "8px 10px",
+                                                                borderRadius: 10,
+                                                                border: `2px solid ${platformColor}`,
+                                                                background: ok || commonPlatforms.length > 0
+                                                                    ? `linear-gradient(135deg, ${platformColor} 0%, ${platformColor}cc 100%)`
+                                                                    : "rgba(255,255,255,0.05)",
+                                                                display: "flex",
+                                                                flexDirection: "column",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                fontWeight: 700,
+                                                                fontSize: 10,
+                                                                boxShadow: ok || commonPlatforms.length > 0 ? `0 2px 8px ${platformColor}66` : "none",
+                                                                transition: "all 0.3s ease",
+                                                                gap: 4,
+                                                            }}
+                                                        >
+                                                            <div style={{ fontSize: 9, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>🎮 Plateforme</div>
+                                                            <div style={{ fontSize: 11, fontWeight: 800, textAlign: "center", lineHeight: 1.3 }}>
+                                                                {ok ? (
+                                                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center" }}>
+                                                                        {(currentGame?.platforms ?? []).map((p, idx) => (
+                                                                            <span key={idx} style={{ fontSize: 9, background: "rgba(0,0,0,0.2)", padding: "2px 5px", borderRadius: 4 }}>{p}</span>
+                                                                        ))}
                                                                     </div>
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                                ) : commonPlatforms.length > 0 ? (
+                                                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center" }}>
+                                                                        {commonPlatforms.map((p, idx) => (
+                                                                            <span key={idx} style={{ fontSize: 9, background: "rgba(0,0,0,0.2)", padding: "2px 5px", borderRadius: 4 }}>{p}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : 'Aucune'}
+                                                            </div>
+                                                        </div>
 
                                                         {/* Carré Genre */}
-                                                        {(() => {
-                                                            const genreKey = `genre-${actualIndex}-${g}`;
-                                                            const isExpanded = expandedCards.has(genreKey);
-                                                            const hasManyGenres = guessedGame?.genres && guessedGame.genres.length > 1;
-
-                                                            return (
-                                                                <div
-                                                                    onClick={() => {
-                                                                        if (hasManyGenres) {
-                                                                            setExpandedCards(prev => {
-                                                                                const next = new Set(prev);
-                                                                                if (next.has(genreKey)) {
-                                                                                    next.delete(genreKey);
-                                                                                } else {
-                                                                                    next.add(genreKey);
-                                                                                }
-                                                                                return next;
-                                                                            });
-                                                                        }
-                                                                    }}
-                                                                    style={{
-                                                                        minWidth: isExpanded ? 180 : 110,
-                                                                        maxWidth: isExpanded ? 250 : 110,
-                                                                        minHeight: 60,
-                                                                        padding: "8px 10px",
-                                                                        borderRadius: 10,
-                                                                        border: `2px solid ${genreColor}`,
-                                                                        background: ok || commonGenres.length > 0
-                                                                            ? `linear-gradient(135deg, ${genreColor} 0%, ${genreColor}cc 100%)`
-                                                                            : "rgba(255,255,255,0.05)",
-                                                                        display: "flex",
-                                                                        flexDirection: "column",
-                                                                        alignItems: "center",
-                                                                        justifyContent: "center",
-                                                                        fontWeight: 700,
-                                                                        fontSize: 10,
-                                                                        boxShadow: ok || commonGenres.length > 0 ? `0 2px 8px ${genreColor}66` : "none",
-                                                                        transition: "all 0.3s ease",
-                                                                        gap: 4,
-                                                                        cursor: hasManyGenres ? "pointer" : "default"
-                                                                    }}
-                                                                    onMouseEnter={(e) => {
-                                                                        if (hasManyGenres) {
-                                                                            e.currentTarget.style.transform = "scale(1.02)";
-                                                                        }
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        if (hasManyGenres) {
-                                                                            e.currentTarget.style.transform = "scale(1)";
-                                                                        }
-                                                                    }}
-                                                                >
-                                                                    <div style={{ fontSize: 9, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>🎯 Genre</div>
-                                                                    <div style={{ fontSize: 11, fontWeight: 800, textAlign: "center", lineHeight: 1.3 }}>
-                                                                        {isExpanded ? (
-                                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center" }}>
-                                                                                {guessedGame?.genres?.map((genre, idx) => (
-                                                                                    <span key={idx} style={{
-                                                                                        fontSize: 9,
-                                                                                        background: "rgba(0,0,0,0.2)",
-                                                                                        padding: "2px 5px",
-                                                                                        borderRadius: 4
-                                                                                    }}>{genre}</span>
-                                                                                ))}
-                                                                            </div>
-                                                                        ) : (
-                                                                            <>
-                                                                                {guessedGame?.genres?.[0] || 'N/A'}
-                                                                                {hasManyGenres && ` +${(guessedGame.genres?.length || 1) - 1}`}
-                                                                            </>
-                                                                        )}
+                                                        <div
+                                                            style={{
+                                                                flex: 1,
+                                                                minWidth: 100,
+                                                                minHeight: 56,
+                                                                padding: "8px 10px",
+                                                                borderRadius: 10,
+                                                                border: `2px solid ${genreColor}`,
+                                                                background: ok || commonGenres.length > 0
+                                                                    ? `linear-gradient(135deg, ${genreColor} 0%, ${genreColor}cc 100%)`
+                                                                    : "rgba(255,255,255,0.05)",
+                                                                display: "flex",
+                                                                flexDirection: "column",
+                                                                alignItems: "center",
+                                                                justifyContent: "center",
+                                                                fontWeight: 700,
+                                                                fontSize: 10,
+                                                                boxShadow: ok || commonGenres.length > 0 ? `0 2px 8px ${genreColor}66` : "none",
+                                                                transition: "all 0.3s ease",
+                                                                gap: 4,
+                                                            }}
+                                                        >
+                                                            <div style={{ fontSize: 9, opacity: 0.7, textTransform: "uppercase", letterSpacing: 0.5 }}>🎯 Genre</div>
+                                                            <div style={{ fontSize: 11, fontWeight: 800, textAlign: "center", lineHeight: 1.3 }}>
+                                                                {ok ? (
+                                                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center" }}>
+                                                                        {(currentGame?.genres ?? []).map((genre, idx) => (
+                                                                            <span key={idx} style={{ fontSize: 9, background: "rgba(0,0,0,0.2)", padding: "2px 5px", borderRadius: 4 }}>{genre}</span>
+                                                                        ))}
                                                                     </div>
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                                ) : commonGenres.length > 0 ? (
+                                                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center" }}>
+                                                                        {commonGenres.map((genre, idx) => (
+                                                                            <span key={idx} style={{ fontSize: 9, background: "rgba(0,0,0,0.2)", padding: "2px 5px", borderRadius: 4 }}>{genre}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : 'Aucun'}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1015,15 +918,13 @@ export default function App() {
                                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
                                         <button
                                             onClick={async () => {
-                                                const text = `Covergle ${mode === "daily" ? dateIso : "Infinite"}\n${shareGrid(
-                                                    guesses.length,
-                                                    isWin
-                                                )}`;
+                                                const text = shareText(guesses.length, isWin, mode, dateIso);
                                                 try {
                                                     await navigator.clipboard.writeText(text);
                                                 } catch {
                                                     alert(text);
                                                 }
+                                                posthog.capture("result_shared", { mode, win: isWin, tries: guesses.length });
                                             }}
                                             style={{
                                                 padding: "12px 20px",
@@ -1955,12 +1856,54 @@ export default function App() {
                             </div>
                         </div>
 
+                        {/* Lien Discord */}
+                        <a
+                            href="https://discord.gg/KaS62Tueu"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 10,
+                                marginTop: 20,
+                                padding: "12px 24px",
+                                borderRadius: 12,
+                                border: "2px solid rgba(88, 101, 242, 0.6)",
+                                background: "linear-gradient(135deg, rgba(88, 101, 242, 0.3) 0%, rgba(114, 137, 218, 0.2) 100%)",
+                                color: "white",
+                                fontWeight: 700,
+                                fontSize: 15,
+                                textDecoration: "none",
+                                transition: "all 0.3s ease",
+                                backdropFilter: "blur(10px)"
+                            }}
+                            onMouseEnter={(e) => {
+                                (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg, rgba(88, 101, 242, 0.5) 0%, rgba(114, 137, 218, 0.4) 100%)";
+                                (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(-2px)";
+                                (e.currentTarget as HTMLAnchorElement).style.boxShadow = "0 6px 20px rgba(88, 101, 242, 0.4)";
+                            }}
+                            onMouseLeave={(e) => {
+                                (e.currentTarget as HTMLAnchorElement).style.background = "linear-gradient(135deg, rgba(88, 101, 242, 0.3) 0%, rgba(114, 137, 218, 0.2) 100%)";
+                                (e.currentTarget as HTMLAnchorElement).style.transform = "translateY(0)";
+                                (e.currentTarget as HTMLAnchorElement).style.boxShadow = "none";
+                            }}
+                        >
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                            </svg>
+                            Rejoindre le Discord
+                        </a>
+
                         {/* Bouton de fermeture */}
                         <button
-                            onClick={() => setShowRulesPopup(false)}
+                            onClick={() => {
+                                localStorage.setItem("covergle_rules_seen_v2", "1");
+                                setShowRulesPopup(false);
+                            }}
                             style={{
                                 width: "100%",
-                                marginTop: 24,
+                                marginTop: 12,
                                 padding: "14px 24px",
                                 borderRadius: 12,
                                 border: "2px solid rgba(255, 255, 255, 0.2)",
