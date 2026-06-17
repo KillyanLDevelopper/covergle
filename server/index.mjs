@@ -157,6 +157,7 @@ offset ${page * PAGE_SIZE};
                 coverSmall: normalizeCoverUrl(g.cover.url, "cover_small"),
                 aliases: [g.name],
                 follows: Number(g.follows || 0),
+                total_rating_count: Number(g.total_rating_count || 0),
                 platforms: (g.platforms ?? []).map(p => p?.name).filter(Boolean),
                 genres: (g.genres ?? []).map(x => x?.name).filter(Boolean),
             }))
