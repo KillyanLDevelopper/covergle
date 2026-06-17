@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
+import sharp from "sharp";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,18 +127,27 @@ async function ensurePopularPool() {
 
     console.log("🔄 Chargement du pool de jeux populaires...");
 
-    const query = `
-fields id,name,first_release_date,follows,total_rating_count,cover.url,platforms.name,genres.name;
-where cover != null & first_release_date >= 1262304000 & total_rating_count > 10;
-sort total_rating_count desc;
-limit 500;
-`;
+    const PAGE_SIZE = 500;
+    const PAGES = 6; // 6 × 500 = 3000 jeux max
+    const allData = [];
 
     try {
-        const data = await igdbGames(query);
-        console.log(`📦 Réponse IGDB: ${Array.isArray(data) ? data.length : 0} jeux reçus`);
+        for (let page = 0; page < PAGES; page++) {
+            const query = `
+fields id,name,first_release_date,follows,total_rating_count,cover.url,platforms.name,genres.name;
+where cover != null & total_rating_count > 5;
+sort total_rating_count desc;
+limit ${PAGE_SIZE};
+offset ${page * PAGE_SIZE};
+`;
+            const data = await igdbGames(query);
+            if (!Array.isArray(data) || data.length === 0) break;
+            allData.push(...data);
+            console.log(`📦 Page ${page + 1}: ${data.length} jeux (total: ${allData.length})`);
+            if (data.length < PAGE_SIZE) break;
+        }
 
-        const pool = (Array.isArray(data) ? data : [])
+        const pool = allData
             .filter(g => g?.id && g?.name && g?.cover?.url)
             .map(g => ({
                 id: String(g.id),
@@ -147,6 +157,7 @@ limit 500;
                 coverSmall: normalizeCoverUrl(g.cover.url, "cover_small"),
                 aliases: [g.name],
                 follows: Number(g.follows || 0),
+                total_rating_count: Number(g.total_rating_count || 0),
                 platforms: (g.platforms ?? []).map(p => p?.name).filter(Boolean),
                 genres: (g.genres ?? []).map(x => x?.name).filter(Boolean),
             }))
@@ -160,16 +171,15 @@ limit 500;
 
         popularPool = pool;
         popularPoolMap = new Map(pool.map(g => [g.id, g]));
-        popularPoolExpiresAt = now + 12 * 60 * 60 * 1000; // Cache de 12 heures
+        popularPoolExpiresAt = now + 12 * 60 * 60 * 1000;
 
         return popularPool;
     } catch (error) {
         console.error("❌ Erreur lors du chargement du pool:", error);
 
-        // Si on a déjà un pool en cache (même expiré), le réutiliser
         if (popularPool.length > 0) {
             console.warn("⚠️ Réutilisation du pool en cache malgré l'expiration");
-            popularPoolExpiresAt = now + 30 * 60 * 1000; // Retry dans 30 minutes
+            popularPoolExpiresAt = now + 30 * 60 * 1000;
             return popularPool;
         }
 
@@ -187,6 +197,16 @@ function norm(s) {
 
 app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
+});
+
+app.get("/api/pool", async (req, res) => {
+    try {
+        const pool = await ensurePopularPool();
+        res.set("Cache-Control", "public, max-age=3600");
+        res.json(pool);
+    } catch (e) {
+        res.status(500).json({ error: String(e?.message ?? e) });
+    }
 });
 
 app.get("/api/search", async (req, res) => {
@@ -218,7 +238,7 @@ app.get("/api/search", async (req, res) => {
             })
             .filter(x => x.score > 0)
             .sort((a, b) => b.score - a.score)
-            .slice(0, 12)
+            .slice(0, 30)
             .map(x => ({
                 id: x.g.id,
                 title: x.g.title,
@@ -267,14 +287,59 @@ limit 1;
     }
 });
 
-// Servir l'app frontend en cas de route non-API (SPA routing)
+// Cache: imageId:step -> Buffer
+const coverCache = new Map();
+const BLOCK_STEPS = [48, 32, 24, 16, 10, 6];
+
+app.get("/api/cover/:imageId", async (req, res) => {
+    try {
+        const imageId = req.params.imageId;
+        if (!imageId || imageId.length > 100 || imageId.includes("..") || imageId.includes("/")) {
+            return res.status(400).end();
+        }
+
+        const stepParam = Number(req.query.step ?? 0);
+        const cacheKey = `${imageId}:${stepParam}`;
+
+        let buffer = coverCache.get(cacheKey);
+        if (!buffer) {
+            const igdbUrl = `https://images.igdb.com/igdb/image/upload/t_cover_big/${imageId}.jpg`;
+            const fetchRes = await fetch(igdbUrl);
+            if (!fetchRes.ok) return res.status(502).end();
+            const src = Buffer.from(await fetchRes.arrayBuffer());
+
+            if (stepParam < 0) {
+                // Révélation complète (fin de partie)
+                buffer = src;
+            } else {
+                const step = Math.min(Math.max(stepParam, 0), BLOCK_STEPS.length - 1);
+                const block = BLOCK_STEPS[step];
+                const meta = await sharp(src).metadata();
+                const sw = Math.max(1, Math.floor(meta.width / block));
+                const sh = Math.max(1, Math.floor(meta.height / block));
+                // Renvoyer la mini-image — le canvas frontend la scale avec imageSmoothingEnabled=false
+                buffer = await sharp(src).resize(sw, sh, { kernel: "nearest" }).jpeg({ quality: 80 }).toBuffer();
+            }
+            coverCache.set(cacheKey, buffer);
+        }
+
+        res.set("Content-Type", "image/jpeg");
+        res.set("Cache-Control", "public, max-age=3600");
+        res.send(buffer);
+    } catch (e) {
+        console.error("❌ /api/cover:", e.message);
+        res.status(500).end();
+    }
+});
+
+// Fallback SPA : uniquement si le fichier statique n'existe pas
 if (process.env.NODE_ENV === "production") {
     app.use((req, res, next) => {
-        if (!req.path.startsWith('/api')) {
-            res.sendFile(path.join(distPath, "index.html"));
-        } else {
-            next();
-        }
+        if (req.path.startsWith('/api')) return next();
+        const filePath = path.join(distPath, req.path);
+        res.sendFile(filePath, (err) => {
+            if (err) res.sendFile(path.join(distPath, "index.html"));
+        });
     });
 }
 

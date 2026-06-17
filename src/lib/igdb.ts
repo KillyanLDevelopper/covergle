@@ -6,6 +6,7 @@ export type IgdbGame = {
     genres?: string[];
     cover: string | null;
     aliases: string[];
+    total_rating_count?: number;
 };
 
 export async function igdbSearch(q: string): Promise<IgdbGame[]> {

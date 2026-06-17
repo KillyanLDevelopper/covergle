@@ -4,10 +4,11 @@ import { normalizeGuess } from "../lib/normalize";
 
 type Props = {
     disabled?: boolean;
+    guesses?: string[];
     onSubmit: (guess: string) => void;
 };
 
-export function GuessBox({ disabled, onSubmit }: Props) {
+export function GuessBox({ disabled, guesses = [], onSubmit }: Props) {
     const [value, setValue] = useState("");
     const [open, setOpen] = useState(false);
     const [items, setItems] = useState<IgdbGame[]>([]);
@@ -26,31 +27,21 @@ export function GuessBox({ disabled, onSubmit }: Props) {
             lastQueryRef.current = q;
             const res = await igdbSearch(value);
             if (lastQueryRef.current !== q) return;
-            setItems(res.slice(0, 8));
+            const filtered = res.filter(g => !guesses.some(prev => normalizeGuess(prev) === normalizeGuess(g.title)));
+            setItems(filtered.slice(0, 30));
         }, 180);
 
         return () => clearTimeout(t);
-    }, [q, value, disabled]);
+    }, [q, value, disabled, guesses]);
 
     function submit(gameTitle?: string) {
-        // Si un titre de jeu est fourni explicitement (clic sur suggestion), l'utiliser
-        if (gameTitle) {
-            onSubmit(gameTitle);
-        }
-        // Sinon, si des suggestions existent, prendre le premier
-        else if (items.length > 0) {
-            onSubmit(items[0].title);
-        }
-        // Sinon, utiliser la valeur tapée
-        else {
-            const guess = value.trim();
-            if (!guess) return;
-            onSubmit(guess);
-        }
+        const title = gameTitle ?? items[0]?.title;
+        if (!title) return; // aucune suggestion valide → on bloque
 
         setValue("");
         setOpen(false);
         setItems([]);
+        onSubmit(title);
     }
 
     return (
@@ -103,7 +94,9 @@ export function GuessBox({ disabled, onSubmit }: Props) {
                         borderRadius: 12,
                         border: "1px solid rgba(255,255,255,0.12)",
                         overflow: "hidden",
-                        background: "rgba(0,0,0,0.55)"
+                        background: "rgba(0,0,0,0.55)",
+                        maxHeight: 320,
+                        overflowY: "auto"
                     }}
                 >
                     {items.map(g => (
