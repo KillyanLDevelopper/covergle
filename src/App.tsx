@@ -11,6 +11,7 @@ import {
 } from "./lib/storage";
 import { CanvasPixelCover } from "./ui/CanvasPixelCover";
 import { GuessBox } from "./ui/GuessBox";
+import { CookieBanner, hasConsent, initAnalytics } from "./ui/CookieBanner";
 import { igdbGet, igdbSearch, type IgdbGame } from "./lib/igdb";
 import posthog from "posthog-js";
 
@@ -141,6 +142,10 @@ export default function App() {
 
     // État pour le pop-up des règles
     const [showRulesPopup, setShowRulesPopup] = useState(() => !localStorage.getItem("covergle_rules_seen_v2"));
+
+    // Consentement cookies
+    const [showCookieBanner, setShowCookieBanner] = useState(() => hasConsent() === null);
+    useEffect(() => { initAnalytics(); }, []);
 
     const currentGame = mode === "daily" ? dailyGame : infiniteGame;
     const guesses = mode === "daily" ? dailyState.guesses : infGuesses;
@@ -1731,6 +1736,11 @@ export default function App() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Bandeau consentement cookies */}
+            {showCookieBanner && (
+                <CookieBanner onConsent={() => setShowCookieBanner(false)} />
             )}
 
             {/* Pop-up des règles */}
